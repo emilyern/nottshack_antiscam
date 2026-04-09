@@ -46,4 +46,40 @@ router.post("/send", authMiddleware, async (req, res) => {
   }
 });
 
+// ─── GET /wallet/balance ───────────────────────────────────────
+// Returns the current user's wallet balance
+// 🔒 Protected — user must be logged in
+router.get("/balance", authMiddleware, async (req, res) => {
+  try {
+    const user = db.findUserById(req.user.id);
+    if (!user) return res.status(404).json({ error: "User not found." });
+
+    // Using stub balance since we're in testnet/offline mode
+    return res.status(200).json({
+      address: user.walletAddress,
+      balance: 0,
+      unconfirmedBalance: 0,
+    });
+  } catch (err) {
+    console.error("Balance error:", err);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── GET /wallet/history ───────────────────────────────────────
+// Returns transaction history for the current user's wallet
+// 🔒 Protected — user must be logged in
+router.get("/history", authMiddleware, (req, res) => {
+  try {
+    const user = db.findUserById(req.user.id);
+    if (!user) return res.status(404).json({ error: "User not found." });
+
+    const transactions = db.getTransactionsByWallet(user.walletAddress);
+    return res.status(200).json({ transactions });
+  } catch (err) {
+    console.error("History error:", err);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 module.exports = router;
