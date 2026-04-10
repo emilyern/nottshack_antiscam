@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 const { riskScore } = require("../services/riskEngine");
+const { getWalletData } = require("../models/walletDataset");
 
 // ─── POST /risk/analyze ────────────────────────────────────────
 router.post("/analyze", authMiddleware, async (req, res) => {
@@ -12,15 +13,27 @@ router.post("/analyze", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: "address is required." });
     }
 
-    const walletData = {
-      new_wallet: true,
-      transaction_count: 0,
-      total_amount: 0,
-    };
+    // Pull from dataset (falls back to unknown wallet defaults if not found)
+    const walletData = getWalletData(address);
+
+    // Force critical if blacklisted
+    if (walletData.blacklisted) {
+      return res.status(200).json({
+        address,
+        level: "critical",
+        score: 10,
+        recommendation: "This address is blacklisted. Transaction is blocked.",
+        factors: [
+          {
+            code: "BLACKLISTED",
+            description: walletData.blacklist_reason || "Address is on the blacklist.",
+            weight: 10,
+          },
+        ],
+      });
+    }
 
     const result = riskScore(walletData);
-
-    // Clean level string (remove emoji prefix from riskEngine e.g. "🟢 low" -> "low")
     const cleanLevel = result.level.replace(/^[^\w]+/, "").trim();
 
     const factors = [];
@@ -57,12 +70,12 @@ router.post("/analyze", authMiddleware, async (req, res) => {
 // ─── GET /risk/report/:address ─────────────────────────────────
 router.get("/report/:address", authMiddleware, (req, res) => {
   const { address } = req.params;
+  const walletData = getWalletData(address);
   return res.status(200).json({
     address,
-    level: "low",
-    score: 0,
-    recommendation: "No prior report found. Run an analysis first.",
-    factors: [],
+    label: walletData.label,
+    blacklisted: walletData.blacklisted,
+    blacklist_reason: walletData.blacklist_reason || null,
   });
 });
 
