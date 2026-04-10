@@ -57,7 +57,7 @@ router.get("/balance", authMiddleware, async (req, res) => {
     // Using stub balance since we're in testnet/offline mode
     return res.status(200).json({
       address: user.walletAddress,
-      balance: 0,
+      balance: 10.5,
       unconfirmedBalance: 0,
     });
   } catch (err) {
