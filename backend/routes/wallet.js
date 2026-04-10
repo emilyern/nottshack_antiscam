@@ -1,45 +1,60 @@
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/auth");
-const { sendTransaction } = require("../services/blockchainService");
+const { sendDash } = require("../services/dashApiService");
 const db = require("../models/database");
 const { v4: uuidv4 } = require("uuid");
 
 // ─── POST /wallet/send ─────────────────────────────────────────
-// Sends a transaction from one wallet to another (via Team C)
-// 🔒 Protected — user must be logged in
 router.post("/send", authMiddleware, async (req, res) => {
   try {
-    const { from, to, amount } = req.body;
+    const { toAddress, amount, note, bypassRisk } = req.body;
 
-    // 1. Validate input
-    if (!from || !to || !amount) {
-      return res.status(400).json({ error: "from, to, and amount are required." });
+    if (!toAddress || !amount) {
+      return res.status(400).json({ error: "toAddress and amount are required." });
     }
 
     if (amount <= 0) {
       return res.status(400).json({ error: "Amount must be greater than 0." });
     }
 
-    // 2. Call Team C to execute the transaction
-    const result = await sendTransaction({ from, to, amount });
+    // Get the sender's wallet info from DB
+    const user = db.findUserById(req.user.id);
+    if (!user) return res.status(404).json({ error: "User not found." });
 
-    // 3. Save transaction to local database
+    // Attempt to send on testnet
+    let txid = null;
+    try {
+      txid = await sendDash(user.mnemonic, toAddress, amount);
+    } catch (chainErr) {
+      console.error("Chain error:", chainErr.message);
+      // Save as failed transaction
+      db.addTransaction({
+        id: uuidv4(),
+        from: user.walletAddress,
+        to: toAddress,
+        amount,
+        note: note || "",
+        status: "failed",
+        timestamp: new Date().toISOString(),
+      });
+      return res.status(400).json({ error: "Blockchain transaction failed: " + chainErr.message });
+    }
+
+    // Save successful transaction
     db.addTransaction({
       id: uuidv4(),
-      from,
-      to,
+      from: user.walletAddress,
+      to: toAddress,
       amount,
-      status: result.success ? "success" : "fail",
+      note: note || "",
+      status: "broadcast",
+      txid,
       timestamp: new Date().toISOString(),
     });
 
-    // 4. Return result
-    if (result.success) {
-      return res.status(200).json({ status: "success", txHash: result.txHash });
-    } else {
-      return res.status(400).json({ status: "fail", error: result.error });
-    }
+    return res.status(200).json({ status: "success", txid });
+
   } catch (err) {
     console.error("Send transaction error:", err);
     return res.status(500).json({ error: "Internal server error." });
@@ -47,14 +62,11 @@ router.post("/send", authMiddleware, async (req, res) => {
 });
 
 // ─── GET /wallet/balance ───────────────────────────────────────
-// Returns the current user's wallet balance
-// 🔒 Protected — user must be logged in
 router.get("/balance", authMiddleware, async (req, res) => {
   try {
     const user = db.findUserById(req.user.id);
     if (!user) return res.status(404).json({ error: "User not found." });
 
-    // Using stub balance since we're in testnet/offline mode
     return res.status(200).json({
       address: user.walletAddress,
       balance: 10.5,
@@ -67,8 +79,6 @@ router.get("/balance", authMiddleware, async (req, res) => {
 });
 
 // ─── GET /wallet/history ───────────────────────────────────────
-// Returns transaction history for the current user's wallet
-// 🔒 Protected — user must be logged in
 router.get("/history", authMiddleware, (req, res) => {
   try {
     const user = db.findUserById(req.user.id);
