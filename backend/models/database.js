@@ -1,42 +1,56 @@
 // ─── database.js ──────────────────────────────────────────────
-// This is where you connect to your database and define your data.
-// For now, we use in-memory arrays as a fake database.
-// Swap these out for real DB calls (MongoDB, PostgreSQL, etc.) later.
+// Persists users and transactions to JSON files so data
+// survives server restarts.
 
-// ─── Fake In-Memory Database ───────────────────────────────────
-const users = [
-  // Example:
-  // { id: "1", email: "alice@example.com", passwordHash: "...", walletAddress: "0xABC..." }
-];
+const fs   = require('fs');
+const path = require('path');
 
-const transactions = [
-  // Example:
-  // { id: "tx1", from: "0xABC...", to: "0xDEF...", amount: 50, status: "success", timestamp: "2024-01-01T00:00:00Z" }
-];
+const USERS_PATH = path.join(__dirname, 'users.json');
+const TXS_PATH   = path.join(__dirname, 'transactions.json');
+
+// ─── Helpers ───────────────────────────────────────────────────
+function loadUsers() {
+  if (!fs.existsSync(USERS_PATH)) return [];
+  return JSON.parse(fs.readFileSync(USERS_PATH, 'utf8'));
+}
+
+function saveUsers(users) {
+  fs.writeFileSync(USERS_PATH, JSON.stringify(users, null, 2));
+}
+
+function loadTransactions() {
+  if (!fs.existsSync(TXS_PATH)) return [];
+  return JSON.parse(fs.readFileSync(TXS_PATH, 'utf8'));
+}
+
+function saveTransactions(txs) {
+  fs.writeFileSync(TXS_PATH, JSON.stringify(txs, null, 2));
+}
 
 // ─── User Methods ──────────────────────────────────────────────
-const findUserByEmail = (email) => {
-  return users.find((u) => u.email === email) || null;
-};
+const findUserByEmail = (email) =>
+  loadUsers().find((u) => u.email === email) || null;
 
-const findUserById = (id) => {
-  return users.find((u) => u.id === id) || null;
-};
+const findUserById = (id) =>
+  loadUsers().find((u) => u.id === id) || null;
 
 const createUser = (user) => {
+  const users = loadUsers();
   users.push(user);
+  saveUsers(users);
   return user;
 };
 
 // ─── Transaction Methods ───────────────────────────────────────
-const getTransactionsByWallet = (walletAddress) => {
-  return transactions.filter(
+const getTransactionsByWallet = (walletAddress) =>
+  loadTransactions().filter(
     (tx) => tx.from === walletAddress || tx.to === walletAddress
   );
-};
 
 const addTransaction = (tx) => {
-  transactions.push(tx);
+  const txs = loadTransactions();
+  txs.push(tx);
+  saveTransactions(txs);
   return tx;
 };
 

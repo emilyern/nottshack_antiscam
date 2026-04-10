@@ -1,18 +1,17 @@
-# Dependencies - never push these!
+# Dependencies
 node_modules/
-node_modules
 
-# Build output
-build/
-dist/
-
-# Environment files (contains secrets!)
+# Environment variables (contains secrets!)
 .env
 
-# OS files
-.DS_Store
-Thumbs.db
+# Persistent database files
+models/users.json
+models/transactions.json
 
 # Logs
 *.log
 npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
