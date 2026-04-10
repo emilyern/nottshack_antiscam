@@ -155,8 +155,9 @@ export default function SendPage() {
                 <div style={{ fontSize: '11px', color: '#475569', marginBottom: '6px' }}>Quick test addresses:</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {[
-                    { label: '✅ Safe', addr: 'yNsWkgPLN1u84oBrigDPQ5NgNYEDxQ9rjS' },
-                    { label: '⚠️ Medium', addr: 'ySampleSuspiciousAddress1111111111' },
+                    { label: '✅ Safe',        addr: 'yNsWkgPLN1u84oBrigDPQ5NgNYEDxQ9rjS'  },
+                    { label: '⚠️ Medium',     addr: 'ySampleSuspiciousAddress1111111111'    },
+                    { label: '🔴 High',        addr: 'yHighRiskBurnerWallet33333333333333'  },
                     { label: '🚨 Blacklisted', addr: 'yXkHXoFjmQMHZ3J2rkVhiMpnMmNiPkBMzE' },
                   ].map(({ label, addr }) => (
                     <button key={addr} type="button"
