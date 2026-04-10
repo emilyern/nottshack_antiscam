@@ -91,7 +91,7 @@ export default function History() {
         <div style={tableWrap}>
           {/* Header row */}
           <div style={headerRow}>
-            {['Type', 'Address', 'Amount', 'Risk', 'Status', 'Date', 'Explorer'].map((h) => (
+            {['Type', 'Address', 'Amount', 'Risk', 'Status', 'Date'].map((h) => (
               <div key={h} style={th}>{h}</div>
             ))}
           </div>
@@ -160,17 +160,6 @@ export default function History() {
                   <div style={{ ...td, fontSize: '11px', color: '#64748b', whiteSpace: 'nowrap' }}>
                     {tx.timestamp ? new Date(tx.timestamp).toLocaleString() : '—'}
                   </div>
-
-                  {/* Explorer link */}
-                  <div style={td}>
-                    <a
-                      href={`https://testnet-insight.dashevo.org/insight/tx/${tx.txid}`}
-                      target="_blank" rel="noreferrer"
-                      style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#60a5fa', fontSize: '11px', textDecoration: 'none' }}
-                    >
-                      <ExternalLink size={11} /> View
-                    </a>
-                  </div>
                 </div>
               );
             })
@@ -208,7 +197,7 @@ const tableWrap = {
 };
 const headerRow = {
   display: 'grid',
-  gridTemplateColumns: '80px 1fr 120px 140px 90px 140px 60px',
+  gridTemplateColumns: '80px 1fr 120px 140px 90px 140px',
   padding: '10px 16px',
   borderBottom: '1px solid #1e293b',
   backgroundColor: '#0a0f1e',

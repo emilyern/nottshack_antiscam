@@ -69,7 +69,7 @@ router.get("/balance", authMiddleware, async (req, res) => {
 
     return res.status(200).json({
       address: user.walletAddress,
-      balance: 10.5,
+      balance: user.balance ?? 10.5,
       unconfirmedBalance: 0,
     });
   } catch (err) {

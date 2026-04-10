@@ -13,8 +13,7 @@ import RiskBadge from '../RiskBadge';
 import Navbar from '../Navbar';
 import {
   Search, Send, ShieldAlert, ShieldX, ShieldCheck,
-  AlertTriangle, CheckCircle, XCircle, Loader, ArrowLeft,
-  ExternalLink, Info,
+  AlertTriangle, CheckCircle, XCircle, Loader, ArrowLeft, Info,
 } from 'lucide-react';
 
 // Steps in the send flow
@@ -370,13 +369,6 @@ export default function SendPage() {
                 </div>
               ))}
             </div>
-
-            {txResult.explorerUrl && (
-              <a href={txResult.explorerUrl} target="_blank" rel="noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', color: '#60a5fa', fontSize: '13px', textDecoration: 'none', marginBottom: '20px' }}>
-                <ExternalLink size={14} /> View on Testnet Explorer
-              </a>
-            )}
 
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={reset} style={{ ...btnSecondary, flex: 1 }}>

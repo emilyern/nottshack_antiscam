@@ -1,13 +1,14 @@
-const { sendDash } = require('./dashApiService');
+const { v4: uuidv4 } = require('uuid');
 
 async function sendTransaction({ from, to, amount }) {
-  try {
-    const txId = await sendDash(from, to, amount);
-    return { success: true, txHash: txId };
-  } catch (err) {
-    console.error('sendTransaction error:', err);
-    return { success: false, error: err.message };
-  }
+  // Simulate a short delay like a real broadcast
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  // Return a fake but realistic-looking tx hash
+  return {
+    success: true,
+    txHash: uuidv4().replace(/-/g, ''),
+  };
 }
 
 module.exports = { sendTransaction };

@@ -36,15 +36,26 @@ const findUserById = (id) =>
 
 const createUser = (user) => {
   const users = loadUsers();
-  users.push(user);
+  users.push({ ...user, balance: 10.5 }); // starting balance
   saveUsers(users);
   return user;
 };
 
+const updateUserBalance = (id, newBalance) => {
+  const users = loadUsers();
+  const idx = users.findIndex(u => u.id === id);
+  if (idx !== -1) {
+    users[idx].balance = newBalance;
+    saveUsers(users);
+  }
+};
+
 // ─── Transaction Methods ───────────────────────────────────────
+// NOTE: transactions are stored with fromAddress/toAddress fields
+// (not "from"/"to") to match what the frontend expects.
 const getTransactionsByWallet = (walletAddress) =>
   loadTransactions().filter(
-    (tx) => tx.from === walletAddress || tx.to === walletAddress
+    (tx) => tx.fromAddress === walletAddress || tx.toAddress === walletAddress
   );
 
 const addTransaction = (tx) => {
@@ -54,11 +65,12 @@ const addTransaction = (tx) => {
   return tx;
 };
 
-// ─── Export ───────────────────────────────────────────────────
+
 module.exports = {
   findUserByEmail,
   findUserById,
   createUser,
   getTransactionsByWallet,
   addTransaction,
+  updateUserBalance,
 };
