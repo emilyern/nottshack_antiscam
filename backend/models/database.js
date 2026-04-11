@@ -41,6 +41,24 @@ const updateUserMyrBalance = (id, newMyrBalance) => {
   if (idx !== -1) { users[idx].myrBalance = newMyrBalance; saveUsers(users); }
 };
 
+// ─── NEW: update editable profile fields ──────────────────────
+// Only whitelisted fields can be changed (username, email).
+// Returns the updated user object, or null if not found.
+const updateUser = (id, updates) => {
+  const users = loadUsers();
+  const idx = users.findIndex(u => u.id === id);
+  if (idx === -1) return null;
+
+  const allowed = ['username', 'email'];
+  for (const key of allowed) {
+    if (updates[key] !== undefined && updates[key] !== null) {
+      users[idx][key] = updates[key];
+    }
+  }
+  saveUsers(users);
+  return users[idx];
+};
+
 const getTransactionsByWallet = (walletAddress) =>
   loadTransactions().filter(
     (tx) => tx.fromAddress === walletAddress || tx.toAddress === walletAddress
@@ -61,4 +79,5 @@ module.exports = {
   addTransaction,
   updateUserBalance,
   updateUserMyrBalance,
+  updateUser, // ← NEW export
 };

@@ -9,7 +9,8 @@ import Send      from './pages/Send';
 import History   from './pages/History';
 import Buy       from './pages/buy';
 import Sell      from './pages/sell';
-import TopUp from './pages/Topup';
+import TopUp     from './pages/Topup';
+import Profile   from './pages/Profile'; // ← NEW
 
 function ProtectedRoute({ children }) {
   const { isLoggedIn, loading } = useAuth();
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="/buy"       element={<ProtectedRoute><Buy       /></ProtectedRoute>} />
           <Route path="/sell"      element={<ProtectedRoute><Sell      /></ProtectedRoute>} />
           <Route path="/topup"     element={<ProtectedRoute><TopUp     /></ProtectedRoute>} />
+          <Route path="/profile"   element={<ProtectedRoute><Profile   /></ProtectedRoute>} /> {/* ← NEW */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

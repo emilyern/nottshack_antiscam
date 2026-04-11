@@ -45,8 +45,25 @@ export function AuthProvider({ children }) {
     setMyrBalance(500); // reset on logout
   }
 
+  // ─── NEW: update the cached user after a profile edit ───────
+  function updateUser(updatedUser) {
+    setUser(updatedUser);
+    localStorage.setItem('dashguard_user', JSON.stringify(updatedUser));
+  }
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, isLoggedIn: !!user, myrBalance, setMyrBalance }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        loading,
+        isLoggedIn: !!user,
+        myrBalance,
+        setMyrBalance,
+        updateUser, // ← NEW
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

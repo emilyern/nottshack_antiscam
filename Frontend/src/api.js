@@ -30,11 +30,12 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  register:     (data)   => api.post('/auth/register', data),
-  login:        (data)   => api.post('/auth/login', data),
-  me:           ()       => api.get('/auth/me'),
+  register:      (data)   => api.post('/auth/register', data),
+  login:         (data)   => api.post('/auth/login', data),
+  me:            ()       => api.get('/auth/me'),
+  updateProfile: (data)   => api.put('/auth/me', data), // ← NEW
   // Look up a registered user by wallet address (used by Send page)
-  lookupWallet: (wallet) => api.get('/auth/lookup', { params: { wallet } }),
+  lookupWallet:  (wallet) => api.get('/auth/lookup', { params: { wallet } }),
 };
 
 export const walletAPI = {

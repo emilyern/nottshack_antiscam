@@ -115,6 +115,50 @@ router.get("/me", require("../middleware/auth"), (req, res) => {
   }
 });
 
+// ─── NEW: PUT /auth/me ─────────────────────────────────────────
+// Update the logged-in user's editable profile fields (username, email).
+router.put("/me", require("../middleware/auth"), (req, res) => {
+  try {
+    const { username, email } = req.body;
+
+    if (!username && !email) {
+      return res.status(400).json({ error: "Nothing to update." });
+    }
+
+    if (username !== undefined && (typeof username !== "string" || username.trim().length < 2)) {
+      return res.status(400).json({ error: "Username must be at least 2 characters." });
+    }
+
+    if (email !== undefined) {
+      if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: "Invalid email address." });
+      }
+      // Make sure the new email isn't already taken by a different user
+      const existing = db.findUserByEmail(email);
+      if (existing && existing.id !== req.user.id) {
+        return res.status(409).json({ error: "Email already in use." });
+      }
+    }
+
+    const updates = {};
+    if (username !== undefined) updates.username = username.trim();
+    if (email    !== undefined) updates.email    = email.trim();
+
+    const updated = db.updateUser(req.user.id, updates);
+    if (!updated) return res.status(404).json({ error: "User not found." });
+
+    return res.status(200).json({
+      id: updated.id,
+      username: updated.username,
+      email: updated.email,
+      walletAddress: updated.walletAddress,
+    });
+  } catch (err) {
+    console.error("Update profile error:", err);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // Look up a registered user by their wallet address.
 // Returns { found: true, username } or { found: false }.
 // Used by the Send page to show the receiver's username.

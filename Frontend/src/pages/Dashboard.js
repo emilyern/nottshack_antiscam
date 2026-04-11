@@ -14,7 +14,7 @@ import {
 } from 'recharts';
 import {
   Wallet, ArrowUpRight, ArrowDownLeft, Shield,
-  RefreshCw, Copy, Check, Send, AlertTriangle, TrendingUp,
+  RefreshCw, Copy, Check, Send, AlertTriangle, TrendingUp, User,
 } from 'lucide-react';
 
 const RISK_COLORS = {
@@ -125,6 +125,45 @@ export default function Dashboard() {
     <div style={{ minHeight: '100vh', backgroundColor: '#020617' }}>
       <Navbar />
       <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '28px 24px' }}>
+
+        {/* ======== PROFILE CARD (entry point to /profile) ======== */}
+        <div style={{
+          ...card,
+          display: 'flex', alignItems: 'center', gap: '16px',
+          marginBottom: '20px',
+        }}>
+          <div style={{
+            width: '48px', height: '48px',
+            borderRadius: '50%',
+            backgroundColor: '#1e3a5f',
+            border: '2px solid #3b82f6',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '20px', fontWeight: 800, color: '#60a5fa',
+            flexShrink: 0,
+          }}>
+            {user?.username?.[0]?.toUpperCase() || '?'}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc' }}>
+              {user?.username || '—'}
+            </div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user?.email || '—'}
+            </div>
+          </div>
+          <Link
+            to="/profile"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              padding: '8px 14px', borderRadius: '8px',
+              backgroundColor: '#1e293b', border: '1px solid #334155',
+              color: '#e2e8f0', fontSize: '13px', fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
+            <User size={14} /> Edit Profile
+          </Link>
+        </div>
 
         {error && <div style={errorBanner}>{error}</div>}
 
