@@ -9,7 +9,7 @@ import Send      from './pages/Send';
 import History   from './pages/History';
 import Buy       from './pages/buy';
 import Sell      from './pages/sell';
-import TopUp from './pages/Topup';
+import TopUp from './pages/TopUp';
 
 function ProtectedRoute({ children }) {
   const { isLoggedIn, loading } = useAuth();
