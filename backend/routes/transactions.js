@@ -1,5 +1,5 @@
 const express = require("express");
-const router = express.Router();
+const router = require("express").Router();
 const { v4: uuidv4 } = require("uuid");
 const authMiddleware = require("../middleware/auth");
 const db = require("../models/database");
@@ -19,16 +19,15 @@ router.post("/send", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: "toAddress and a valid amount are required." });
     }
 
-    // 2. Look up the logged-in user (we need their mnemonic to sign the tx)
+    // 2. Look up the logged-in user
     const user = db.findUserById(req.user.id);
     if (!user) {
       return res.status(404).json({ error: "User not found." });
     }
 
-    // 3. Risk check — now returns { level, score }
-    const risk = await checkRisk(toAddress);
-    const cleanLevel = risk.level.replace(/^[^\w]+/, "").trim(); // strip emoji prefix
-    const riskScoreValue = risk.score;
+    // 3. Risk check (uses wallet dataset correctly after riskService fix)
+    const riskLevel = await checkRisk(toAddress);
+    const cleanLevel = riskLevel.replace(/^[^\w]+/, "").trim();
 
     if ((cleanLevel === "high" || cleanLevel === "critical") && !bypassRisk) {
       return res.status(403).json({
@@ -37,7 +36,13 @@ router.post("/send", authMiddleware, async (req, res) => {
       });
     }
 
-    // 4. Broadcast transaction (uses mnemonic to sign)
+    // BUG FIX: Check balance BEFORE broadcasting (was after, allowing overdraft)
+    const currentBalance = user.balance ?? 10.5;
+    if (currentBalance < amount) {
+      return res.status(400).json({ error: "Insufficient balance." });
+    }
+
+    // 4. Broadcast transaction
     const result = await sendTransaction({
       from: user.mnemonic,
       to: toAddress,
@@ -48,13 +53,10 @@ router.post("/send", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: result.error });
     }
 
-    const newBalance = (user.balance ?? 10.5) - amount;
-    if (newBalance < 0) {
-      return res.status(400).json({ error: "Insufficient balance." });
-    }
-    db.updateUserBalance(user.id, newBalance);
+    // Deduct balance after confirmed broadcast
+    db.updateUserBalance(user.id, currentBalance - amount);
 
-    // 5. Save to local database — includes riskScore now
+    // 5. Save to local database
     db.addTransaction({
       id: uuidv4(),
       fromAddress: user.walletAddress,
@@ -62,7 +64,6 @@ router.post("/send", authMiddleware, async (req, res) => {
       amount,
       note: note || "",
       riskLevel: cleanLevel,
-      riskScore: riskScoreValue,
       txid: result.txHash,
       status: "broadcast",
       timestamp: new Date().toISOString(),
@@ -81,7 +82,6 @@ router.post("/send", authMiddleware, async (req, res) => {
 });
 
 // ─── GET /transactions ─────────────────────────────────────────
-// Returns transaction history for a given wallet address.
 // 🔒 Protected — user must be logged in
 router.get("/", authMiddleware, (req, res) => {
   try {

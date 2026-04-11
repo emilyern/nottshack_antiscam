@@ -1,93 +1,101 @@
 const express = require("express");
-const router = express.Router();
-const authMiddleware = require("../middleware/auth");
-const { sendDash } = require("../services/dashApiService");
-const db = require("../models/database");
+const router = require("express").Router();
 const { v4: uuidv4 } = require("uuid");
+const authMiddleware = require("../middleware/auth");
+const db = require("../models/database");
+const { checkRisk } = require("../services/riskService");
+const { sendTransaction } = require("../services/blockchainService");
 
-// ─── POST /wallet/send ─────────────────────────────────────────
+// ─── POST /transactions/send ───────────────────────────────────
+// Sends DASH from logged-in user's wallet to a recipient address.
+// Runs a risk check first; blocks high/critical unless bypassRisk=true.
+// 🔒 Protected — user must be logged in
 router.post("/send", authMiddleware, async (req, res) => {
   try {
     const { toAddress, amount, note, bypassRisk } = req.body;
 
-    if (!toAddress || !amount) {
-      return res.status(400).json({ error: "toAddress and amount are required." });
+    // 1. Validate input
+    if (!toAddress || !amount || amount <= 0) {
+      return res.status(400).json({ error: "toAddress and a valid amount are required." });
     }
 
-    if (amount <= 0) {
-      return res.status(400).json({ error: "Amount must be greater than 0." });
-    }
-
-    // Get the sender's wallet info from DB
+    // 2. Look up the logged-in user
     const user = db.findUserById(req.user.id);
-    if (!user) return res.status(404).json({ error: "User not found." });
-
-    // Attempt to send on testnet
-    let txid = null;
-    try {
-      txid = await sendDash(user.mnemonic, toAddress, amount);
-    } catch (chainErr) {
-      console.error("Chain error:", chainErr.message);
-      // Save as failed transaction
-      db.addTransaction({
-        id: uuidv4(),
-        from: user.walletAddress,
-        to: toAddress,
-        amount,
-        note: note || "",
-        status: "failed",
-        timestamp: new Date().toISOString(),
-      });
-      return res.status(400).json({ error: "Blockchain transaction failed: " + chainErr.message });
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
     }
 
-    // Save successful transaction
+    // 3. Risk check (uses wallet dataset correctly after riskService fix)
+    const riskLevel = await checkRisk(toAddress);
+    const cleanLevel = riskLevel.replace(/^[^\w]+/, "").trim();
+
+    if ((cleanLevel === "high" || cleanLevel === "critical") && !bypassRisk) {
+      return res.status(403).json({
+        error: `Transaction blocked: ${cleanLevel} risk address.`,
+        canBypass: true,
+      });
+    }
+
+    // BUG FIX: Check balance BEFORE broadcasting (was after, allowing overdraft)
+    const currentBalance = user.balance ?? 10.5;
+    if (currentBalance < amount) {
+      return res.status(400).json({ error: "Insufficient balance." });
+    }
+
+    // 4. Broadcast transaction
+    const result = await sendTransaction({
+      from: user.mnemonic,
+      to: toAddress,
+      amount,
+    });
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    // Deduct balance after confirmed broadcast
+    db.updateUserBalance(user.id, currentBalance - amount);
+
+    // 5. Save to local database
     db.addTransaction({
       id: uuidv4(),
-      fromAddress: user.walletAddress,  
-      toAddress,                        
+      fromAddress: user.walletAddress,
+      toAddress,
       amount,
       note: note || "",
+      riskLevel: cleanLevel,
+      txid: result.txHash,
       status: "broadcast",
-      txid,
       timestamp: new Date().toISOString(),
     });
 
-    return res.status(200).json({ status: "success", txid });
-
-  } catch (err) {
-    console.error("Send transaction error:", err);
-    return res.status(500).json({ error: "Internal server error." });
-  }
-});
-
-// ─── GET /wallet/balance ───────────────────────────────────────
-router.get("/balance", authMiddleware, async (req, res) => {
-  try {
-    const user = db.findUserById(req.user.id);
-    if (!user) return res.status(404).json({ error: "User not found." });
-
+    // 6. Return success
     return res.status(200).json({
-      address: user.walletAddress,
-      balance: user.balance ?? 10.5,
-      unconfirmedBalance: 0,
+      txid: result.txHash,
+      explorerUrl: `https://testnet-insight.dashevo.org/insight/tx/${result.txHash}`,
     });
+
   } catch (err) {
-    console.error("Balance error:", err);
+    console.error("Send error:", err);
     return res.status(500).json({ error: "Internal server error." });
   }
 });
 
-// ─── GET /wallet/history ───────────────────────────────────────
-router.get("/history", authMiddleware, (req, res) => {
+// ─── GET /transactions ─────────────────────────────────────────
+// 🔒 Protected — user must be logged in
+router.get("/", authMiddleware, (req, res) => {
   try {
-    const user = db.findUserById(req.user.id);
-    if (!user) return res.status(404).json({ error: "User not found." });
+    const { wallet } = req.query;
 
-    const transactions = db.getTransactionsByWallet(user.walletAddress);
-    return res.status(200).json({ transactions });
+    if (!wallet) {
+      return res.status(400).json({ error: "wallet query param is required." });
+    }
+
+    const history = db.getTransactionsByWallet(wallet);
+    return res.status(200).json({ wallet, transactions: history });
+
   } catch (err) {
-    console.error("History error:", err);
+    console.error("Transactions error:", err);
     return res.status(500).json({ error: "Internal server error." });
   }
 });
