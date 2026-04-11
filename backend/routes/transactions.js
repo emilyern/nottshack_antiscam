@@ -33,7 +33,7 @@ router.post("/send", authMiddleware, async (req, res) => {
 
     // 4. Risk check
     const riskLevel = await checkRisk(toAddress);
-    const cleanLevel = (riskLevel || "low").replace(/^[^\w]+/, "").trim(); // strip emoji prefix, guard undefined
+    const cleanLevel = (riskLevel || "low").replace(/^[^\w]+/, "").trim();
 
     if ((cleanLevel === "high" || cleanLevel === "critical") && !bypassRisk) {
       return res.status(403).json({
@@ -53,7 +53,7 @@ router.post("/send", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: result?.error || "Transaction broadcast failed." });
     }
 
-    // 6. Deduct balance
+    // 6. Deduct balance from sender
     db.updateUserBalance(user.id, currentBalance - amount);
 
     // 7. Save to local database
@@ -95,29 +95,7 @@ router.get("/", authMiddleware, (req, res) => {
     const history = db.getTransactionsByWallet(wallet);
     return res.status(200).json({ wallet, transactions: history });
 
-    // Add balance
-    db.updatenewUserBalance(user.id, currentBalance + amount);
-
-    // Save to local database
-    db.addTransactions({
-      id: uuidv4(),
-      fromAddress: user.walletAddress,
-      toAddress,
-      amount,
-      note: note || "",
-      riskLevel: cleanLevel,
-      txid: result.txHash,
-      status: "broadcast",
-      timestamp: new Date().toISOString(),
-    });
-
-    // 8. Return success
-    return res.status(200).json({
-      txid: result.txHash,
-      explorerUrl: `https://testnet-insight.dashevo.org/insight/tx/${result.txHash}`,
-    });
-
-     } catch (err) {
+  } catch (err) {
     console.error("Transactions error:", err);
     return res.status(500).json({ error: "Internal server error." });
   }
