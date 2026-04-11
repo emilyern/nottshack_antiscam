@@ -39,7 +39,7 @@ const findUserByWalletAddress = (address) =>
 
 const createUser = (user) => {
   const users = loadUsers();
-  users.push({ ...user, balance: 10000000000000000 }); 
+  users.push({ ...user, balance: 1000 }); 
   saveUsers(users);
   return user;
 };
