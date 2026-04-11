@@ -74,7 +74,7 @@ router.get("/balance", authMiddleware, async (req, res) => {
       .filter((tx) => tx.toAddress === user.walletAddress && tx.status !== "failed")
       .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
-    const startingBalance = user.balance ?? 1000;
+    const startingBalance = user.balance ?? 10.5;
     // user.balance is already deducted on send, so we just add received on top
     const effectiveBalance = startingBalance + totalReceived;
 

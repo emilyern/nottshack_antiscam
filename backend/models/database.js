@@ -24,7 +24,7 @@ const findUserById    = (id)    => loadUsers().find((u) => u.id === id)    || nu
 
 const createUser = (user) => {
   const users = loadUsers();
-  users.push({ ...user, balance: 0, myrBalance: 0 }); // start with 0 DASH, 0 MYR
+  users.push({ ...user, balance: 10.5, myrBalance: 0 }); // start with 0 DASH, 0 MYR
   saveUsers(users);
   return user;
 };
