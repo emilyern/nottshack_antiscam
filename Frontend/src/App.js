@@ -1,6 +1,5 @@
 // =============================================================
-// src/App.js
-// Root component — sets up React Router with protected routes.
+// src/App.js — 加了 /buy 和 /sell 路由
 // =============================================================
 
 import React from 'react';
@@ -12,23 +11,21 @@ import Register  from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Send      from './pages/Send';
 import History   from './pages/History';
-import Profile   from './pages/Profile';
+import Buy       from './pages/buy';    // 新加
+import Sell      from './pages/sell';  // 新加
 
-// ---- ProtectedRoute: redirects to /login if not logged in ----
 function ProtectedRoute({ children }) {
   const { isLoggedIn, loading } = useAuth();
   if (loading) return <Splash />;
   return isLoggedIn ? children : <Navigate to="/login" replace />;
 }
 
-// ---- PublicRoute: redirects to /dashboard if already logged in ----
 function PublicRoute({ children }) {
   const { isLoggedIn, loading } = useAuth();
   if (loading) return <Splash />;
   return isLoggedIn ? <Navigate to="/dashboard" replace /> : children;
 }
 
-// ---- Loading splash shown while auth state is being determined ----
 function Splash() {
   return (
     <div style={{
@@ -48,26 +45,24 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        {/* Global reset styles */}
         <style>{`
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #020617; }
           input, textarea, button { font-family: inherit; }
           input:focus, textarea:focus { border-color: #3b82f6 !important; }
+          @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         `}</style>
 
         <Routes>
-          {/* Public routes (redirect to dashboard if already logged in) */}
           <Route path="/login"    element={<PublicRoute><Login    /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
-          {/* Protected routes (redirect to login if not authenticated) */}
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/send"      element={<ProtectedRoute><Send      /></ProtectedRoute>} />
           <Route path="/history"   element={<ProtectedRoute><History   /></ProtectedRoute>} />
-          <Route path="/profile"   element={<ProtectedRoute><Profile   /></ProtectedRoute>} />
+          <Route path="/buy"       element={<ProtectedRoute><Buy       /></ProtectedRoute>} />  {/* 新加 */}
+          <Route path="/sell"      element={<ProtectedRoute><Sell      /></ProtectedRoute>} />  {/* 新加 */}
 
-          {/* Default redirect */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

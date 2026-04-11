@@ -1,17 +1,18 @@
 // =============================================================
-// src/components/Navbar.js
-// Top navigation bar with user info and logout button.
+// src/Navbar.js — 加了 Buy 和 Sell 链接
 // =============================================================
 
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { Shield, LayoutDashboard, Send, History, LogOut, Wallet } from 'lucide-react';
+import { Shield, LayoutDashboard, Send, History, LogOut, TrendingUp, TrendingDown } from 'lucide-react';
 
 const NAV_LINKS = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/send',      label: 'Send DASH',  icon: Send           },
-  { path: '/history',   label: 'History',    icon: History        },
+  { path: '/buy',       label: 'Buy DASH',  icon: TrendingUp      },
+  { path: '/sell',      label: 'Sell DASH', icon: TrendingDown     },
+  { path: '/send',      label: 'Send',      icon: Send             },
+  { path: '/history',   label: 'History',   icon: History          },
 ];
 
 export default function Navbar() {
@@ -37,7 +38,7 @@ export default function Navbar() {
       zIndex: 100,
     }}>
       {/* Logo */}
-      <Link to="/dashboard" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', marginRight: '32px' }}>
+      <Link to="/dashboard" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', marginRight: '24px' }}>
         <Shield size={24} color="#3b82f6" />
         <span style={{ fontWeight: 800, fontSize: '18px', color: '#f8fafc', letterSpacing: '-0.02em' }}>
           Dash<span style={{ color: '#3b82f6' }}>Guard</span>
@@ -59,7 +60,7 @@ export default function Navbar() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                padding: '6px 14px',
+                padding: '6px 12px',
                 borderRadius: '8px',
                 textDecoration: 'none',
                 fontSize: '14px',
@@ -69,59 +70,30 @@ export default function Navbar() {
                 transition: 'all 0.15s',
               }}
             >
-              <Icon size={16} />
+              <Icon size={15} />
               {label}
             </Link>
           );
         })}
       </div>
 
-      {/* User info */}
-      {user && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Wallet size={14} color="#94a3b8" />
-            <span style={{ fontSize: '12px', color: '#64748b', fontFamily: 'monospace' }}>
-              {user.walletAddress?.slice(0, 8)}...{user.walletAddress?.slice(-6)}
-            </span>
-          </div>
-
-          {/* Avatar — clicking goes to /profile */}
-          <Link
-            to="/profile"
-            title="View Profile"
-            style={{
-              width: '32px', height: '32px',
-              borderRadius: '50%',
-              backgroundColor: location.pathname === '/profile' ? '#1e3a5f' : '#1e3a5f',
-              border: location.pathname === '/profile' ? '2px solid #3b82f6' : '2px solid transparent',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '13px', fontWeight: 700, color: '#60a5fa',
-              textDecoration: 'none',
-              transition: 'border-color 0.15s',
-            }}
-          >
-            {user.username?.[0]?.toUpperCase()}
-          </Link>
-
-          <button
-            onClick={handleLogout}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '4px',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              border: '1px solid #334155',
-              backgroundColor: 'transparent',
-              color: '#94a3b8',
-              fontSize: '13px',
-              cursor: 'pointer',
-            }}
-          >
-            <LogOut size={14} />
-            Logout
-          </button>
-        </div>
-      )}
+      {/* User + logout */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <span style={{ fontSize: '13px', color: '#64748b' }}>
+          {user?.username}
+        </span>
+        <button
+          onClick={handleLogout}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '6px 12px', borderRadius: '8px',
+            background: 'transparent', border: '1px solid #1e293b',
+            color: '#64748b', cursor: 'pointer', fontSize: '13px',
+          }}
+        >
+          <LogOut size={14} /> Logout
+        </button>
+      </div>
     </nav>
   );
 }
