@@ -33,8 +33,8 @@ router.post("/send", authMiddleware, async (req, res) => {
     }
 
     // ── Risk check ─────────────────────────────────────────────
-    const risk = await checkRisk(toAddress);
-    const cleanLevel = risk.level.replace(/^[^\w]+/, "").trim();
+    const riskLevel = await checkRisk(toAddress);
+    const cleanLevel = (riskLevel || 'low').replace(/^[^\w]+/, '').trim();
 
     // If blacklisted, record the block and hard reject
     if (cleanLevel === "critical" && risk.score === 10) {
