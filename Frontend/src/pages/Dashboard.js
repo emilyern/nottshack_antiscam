@@ -68,9 +68,13 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    fetchBalance();
-    fetchHistory();
-  }, [fetchBalance, fetchHistory]);
+    const interval = setInterval(() => {
+      fetchBalance();
+      fetchHistory();
+    }, 10000); // refresh every 10 seconds
+
+  return () => clearInterval(interval); // cleanup on unmount
+}, [fetchBalance, fetchHistory]);
 
   // ---- Derived stats ----
   const sentTxs     = history.filter((t) => t.fromAddress === user?.walletAddress);

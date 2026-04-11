@@ -52,6 +52,13 @@ router.post("/send", authMiddleware, async (req, res) => {
     }
     db.updateUserBalance(user.id, newBalance);
 
+    // After debiting sender, find recipient and credit them
+    const recipient = db.findUserByWalletAddress(toAddress);
+    if (recipient) {
+      const recipientNewBalance = (recipient.balance ?? 10.5) + amount;
+      db.updateUserBalance(recipient.id, recipientNewBalance);
+    }
+
     // 5. Save to local database
     db.addTransaction({
       id: uuidv4(),
@@ -61,7 +68,7 @@ router.post("/send", authMiddleware, async (req, res) => {
       note: note || "",
       riskLevel: cleanLevel,
       txid: result.txHash,
-      status: "broadcast",
+      status: "Confirmed",
       timestamp: new Date().toISOString(),
     });
 

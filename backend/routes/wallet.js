@@ -44,8 +44,8 @@ router.post("/send", authMiddleware, async (req, res) => {
     // Save successful transaction
     db.addTransaction({
       id: uuidv4(),
-      from: user.walletAddress,
-      to: toAddress,
+      fromAddress: user.walletAddress,  
+      toAddress,                        
       amount,
       note: note || "",
       status: "broadcast",

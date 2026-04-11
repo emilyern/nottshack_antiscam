@@ -34,6 +34,9 @@ const findUserByEmail = (email) =>
 const findUserById = (id) =>
   loadUsers().find((u) => u.id === id) || null;
 
+const findUserByWalletAddress = (address) =>
+  loadUsers().find((u) => u.walletAddress === address) || null;
+
 const createUser = (user) => {
   const users = loadUsers();
   users.push({ ...user, balance: 10.5 }); // starting balance
@@ -65,10 +68,10 @@ const addTransaction = (tx) => {
   return tx;
 };
 
-
 module.exports = {
   findUserByEmail,
   findUserById,
+  findUserByWalletAddress,
   createUser,
   getTransactionsByWallet,
   addTransaction,
