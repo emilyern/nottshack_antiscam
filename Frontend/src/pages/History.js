@@ -1,7 +1,6 @@
 // =============================================================
 // src/pages/History.js
 // Full transaction history with filtering by direction + risk level.
-// Sorted newest first. Risk score derived from level if not stored.
 // =============================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -14,28 +13,19 @@ import {
   Filter, Shield,
 } from 'lucide-react';
 
-const RISK_SCORES = { low: 3, medium: 5, high: 8, critical: 10 };
-
 export default function History() {
   const { user } = useAuth();
 
   const [transactions, setTransactions] = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [filterDir,    setFilterDir]    = useState('all');
-  const [filterRisk,   setFilterRisk]   = useState('all');
+  const [loading, setLoading]           = useState(true);
+  const [filterDir,  setFilterDir]      = useState('all');   // 'all' | 'sent' | 'received'
+  const [filterRisk, setFilterRisk]     = useState('all');   // 'all' | 'low' | 'medium' | 'high' | 'critical'
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await walletAPI.getHistory();
-      // Newest first + derive riskScore from riskLevel if missing
-      const txs = (data.transactions || [])
-        .map((tx) => ({
-          ...tx,
-          riskScore: tx.riskScore ?? RISK_SCORES[tx.riskLevel] ?? null,
-        }))
-        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      setTransactions(txs);
+      setTransactions(data.transactions || []);
     } catch {
       // silently fail
     } finally {
@@ -48,8 +38,8 @@ export default function History() {
   // ---- Filtering ----
   const filtered = transactions.filter((tx) => {
     const isSent = tx.fromAddress === user?.walletAddress;
-    if (filterDir === 'sent'     && !isSent) return false;
-    if (filterDir === 'received' &&  isSent) return false;
+    if (filterDir === 'sent'     && !isSent)  return false;
+    if (filterDir === 'received' &&  isSent)  return false;
     if (filterRisk !== 'all' && tx.riskLevel !== filterRisk) return false;
     return true;
   });
@@ -99,15 +89,15 @@ export default function History() {
 
         {/* Table */}
         <div style={tableWrap}>
-          {/* Header */}
+          {/* Header row */}
           <div style={headerRow}>
-            {['Type', 'Address', 'Amount', 'Risk', 'Status', 'Date'].map((h) => (
+            {['Type', 'Address / User', 'Amount', 'Risk', 'Status', 'Date'].map((h) => (
               <div key={h} style={th}>{h}</div>
             ))}
           </div>
 
           {loading ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Loading transactions…</div>
+            <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Loading transactions...</div>
           ) : filtered.length === 0 ? (
             <div style={{ padding: '48px', textAlign: 'center' }}>
               <Shield size={36} color="#1e293b" style={{ marginBottom: '12px' }} />
@@ -117,9 +107,11 @@ export default function History() {
             filtered.map((tx) => {
               const isSent = tx.fromAddress === user?.walletAddress;
               const counterparty = isSent ? tx.toAddress : tx.fromAddress;
+              // Show sender username on received transactions
+              const counterpartyUsername = !isSent ? tx.fromUsername : null;
+
               return (
                 <div key={tx.id} style={dataRow}>
-
                   {/* Type */}
                   <div style={td}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -139,27 +131,36 @@ export default function History() {
                     </div>
                   </div>
 
-                  {/* Address */}
+                  {/* Address / Username */}
                   <div style={td}>
-                    <span style={{ fontFamily: 'monospace', fontSize: '11px', color: '#94a3b8' }}>
-                      {counterparty
-                        ? `${counterparty.slice(0, 8)}...${counterparty.slice(-6)}`
-                        : '—'}
-                    </span>
+                    {/* Show username badge if available (received txs only) */}
+                    {counterpartyUsername && (
+                      <div style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        fontSize: '11px', fontWeight: 700, color: '#60a5fa',
+                        backgroundColor: '#0f2a4a', border: '1px solid #1e3a5f',
+                        borderRadius: '4px', padding: '1px 6px', marginBottom: '4px',
+                      }}>
+                        @{counterpartyUsername}
+                      </div>
+                    )}
+                    <div style={{ fontFamily: 'monospace', fontSize: '11px', color: '#94a3b8' }}>
+                      {counterparty ? `${counterparty.slice(0, 8)}...${counterparty.slice(-6)}` : '—'}
+                    </div>
                     {tx.note && (
                       <div style={{ fontSize: '10px', color: '#475569', marginTop: '2px' }}>{tx.note}</div>
                     )}
                   </div>
 
                   {/* Amount */}
-                  <div style={{ ...td, fontWeight: 700, color: isSent ? '#f97316' : '#10b981' }}>
+                  <div style={{ ...td, fontWeight: 700, color: isSent ? '#f97316' : '#10b981', fontSize: '13px' }}>
                     {isSent ? '-' : '+'}{tx.amount?.toFixed(4)} DASH
                   </div>
 
-                  {/* Risk — always shows pill with score if riskLevel exists */}
+                  {/* Risk — use saved riskScore, fallback to '?' for old transactions */}
                   <div style={td}>
                     {tx.riskLevel
-                      ? <RiskPill level={tx.riskLevel} score={tx.riskScore} />
+                      ? <RiskPill level={tx.riskLevel} score={tx.riskScore ?? '?'} />
                       : <span style={{ fontSize: '11px', color: '#475569' }}>N/A</span>
                     }
                   </div>
@@ -173,7 +174,6 @@ export default function History() {
                   <div style={{ ...td, fontSize: '11px', color: '#64748b', whiteSpace: 'nowrap' }}>
                     {tx.timestamp ? new Date(tx.timestamp).toLocaleString() : '—'}
                   </div>
-
                 </div>
               );
             })
@@ -205,11 +205,33 @@ function StatusPill({ status }) {
 }
 
 // ---- Styles ----
-const tableWrap  = { backgroundColor: '#0f172a', borderRadius: '14px', border: '1px solid #1e293b', overflow: 'hidden' };
-const headerRow  = { display: 'grid', gridTemplateColumns: '80px 1fr 120px 140px 90px 140px', padding: '10px 16px', borderBottom: '1px solid #1e293b', backgroundColor: '#0a0f1e' };
-const dataRow    = { display: 'grid', gridTemplateColumns: '80px 1fr 120px 140px 90px 140px', padding: '12px 16px', borderBottom: '1px solid #0f172a', alignItems: 'center' };
-const th         = { fontSize: '11px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' };
-const td         = { fontSize: '13px', color: '#e2e8f0' };
-const iconBtn    = { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center' };
-const filterBtn  = { padding: '4px 10px', borderRadius: '6px', border: '1px solid #1e293b', backgroundColor: 'transparent', color: '#64748b', fontSize: '11px', cursor: 'pointer' };
-const filterBtnActive = { backgroundColor: '#1e3a5f', border: '1px solid #3b82f6', color: '#60a5fa' };
+const tableWrap = {
+  backgroundColor: '#0f172a', borderRadius: '14px',
+  border: '1px solid #1e293b', overflow: 'hidden',
+};
+const headerRow = {
+  display: 'grid',
+  gridTemplateColumns: '80px 1fr 120px 140px 90px 140px',
+  padding: '10px 16px',
+  borderBottom: '1px solid #1e293b',
+  backgroundColor: '#0a0f1e',
+};
+const dataRow = {
+  display: 'grid',
+  gridTemplateColumns: '80px 1fr 120px 140px 90px 140px',
+  padding: '12px 16px',
+  borderBottom: '1px solid #0f172a',
+  alignItems: 'center',
+  transition: 'background-color 0.1s',
+};
+const th = { fontSize: '11px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' };
+const td = { fontSize: '13px', color: '#e2e8f0' };
+const iconBtn = { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center' };
+const filterBtn = {
+  padding: '4px 10px', borderRadius: '6px',
+  border: '1px solid #1e293b', backgroundColor: 'transparent',
+  color: '#64748b', fontSize: '11px', cursor: 'pointer',
+};
+const filterBtnActive = {
+  backgroundColor: '#1e3a5f', border: '1px solid #3b82f6', color: '#60a5fa',
+};

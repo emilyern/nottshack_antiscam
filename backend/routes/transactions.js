@@ -5,6 +5,8 @@ const authMiddleware = require("../middleware/auth");
 const db = require("../models/database");
 const { checkRisk } = require("../services/riskService");
 const { sendTransaction } = require("../services/blockchainService");
+const { riskScore: calcRiskScore } = require("../services/riskEngine");
+const { getWalletData } = require("../models/walletdataset");
 
 // ─── POST /transactions/send ───────────────────────────────────
 // Sends DASH from logged-in user's wallet to a recipient address.
@@ -19,21 +21,15 @@ router.post("/send", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: "toAddress and a valid amount are required." });
     }
 
-    // 2. Look up the logged-in user
+    // 2. Look up the logged-in user (we need their mnemonic to sign the tx)
     const user = db.findUserById(req.user.id);
     if (!user) {
       return res.status(404).json({ error: "User not found." });
     }
 
-    // 3. Check balance BEFORE sending
-    const currentBalance = user.balance ?? 10.5;
-    if (currentBalance - amount < 0) {
-      return res.status(400).json({ error: "Insufficient balance." });
-    }
-
-    // 4. Risk check
+    // 3. Risk check
     const riskLevel = await checkRisk(toAddress);
-    const cleanLevel = (riskLevel || "low").replace(/^[^\w]+/, "").trim();
+    const cleanLevel = riskLevel.replace(/^[^\w]+/, "").trim(); // strip emoji prefix
 
     if ((cleanLevel === "high" || cleanLevel === "critical") && !bypassRisk) {
       return res.status(403).json({
@@ -42,42 +38,51 @@ router.post("/send", authMiddleware, async (req, res) => {
       });
     }
 
-    // 5. Broadcast transaction
+    // 4. Broadcast transaction (uses mnemonic to sign)
     const result = await sendTransaction({
       from: user.mnemonic,
       to: toAddress,
       amount,
     });
 
-    if (!result || !result.success) {
-      return res.status(400).json({ error: result?.error || "Transaction broadcast failed." });
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
     }
+    const newBalance = (user.balance ?? 10.5) - amount;
+    if (newBalance < 0) {
+      return res.status(400).json({ error: "Insufficient balance." });
+    }
+    db.updateUserBalance(user.id, newBalance);
 
-    // 6. Deduct balance from sender
-    db.updateUserBalance(user.id, currentBalance - amount);
+    // 5. Compute the numeric risk score to save alongside the level
+    const walletData = getWalletData(toAddress);
+    const riskResult = calcRiskScore(walletData);
+    const numericScore = cleanLevel === "critical" ? 10 : riskResult.score;
 
-    // 7. Save to local database
+    // 6. Save to local database
     db.addTransaction({
       id: uuidv4(),
       fromAddress: user.walletAddress,
+      fromUsername: user.username,       // ← show sender username in history
       toAddress,
       amount,
       note: note || "",
       riskLevel: cleanLevel,
+      riskScore: numericScore,           // ← persist the numeric score
       txid: result.txHash,
       status: "broadcast",
       timestamp: new Date().toISOString(),
     });
 
-    // 8. Return success
+    // 7. Return success
     return res.status(200).json({
       txid: result.txHash,
       explorerUrl: `https://testnet-insight.dashevo.org/insight/tx/${result.txHash}`,
     });
 
   } catch (err) {
-    console.error("Send error:", err.message, err.stack);
-    return res.status(500).json({ error: err.message || "Internal server error." });
+    console.error("Send error:", err);
+    return res.status(500).json({ error: "Internal server error." });
   }
 });
 
