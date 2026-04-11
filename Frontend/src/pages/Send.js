@@ -1,20 +1,13 @@
-// =============================================================
-// src/pages/Send.js
-// Two-step send flow:
-//   Step 1 — Enter recipient address → analyze risk → show report
-//   Step 2 — Enter amount → confirm + send (with bypass for high risk)
-//   Blocked addresses (score 10) → hard stop, no bypass possible
-// =============================================================
-
+// Frontend/src/pages/Send.js — full replacement
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { riskAPI, transactionAPI } from '../api';
+import { riskAPI, transactionAPI, authAPI } from '../api';
 import RiskBadge from '../RiskBadge';
 import Navbar from '../Navbar';
 import {
   Search, Send, ShieldAlert, ShieldX, ShieldCheck,
-  AlertTriangle, CheckCircle, XCircle, Loader, ArrowLeft, Info, Ban,
+  AlertTriangle, CheckCircle, Loader, ArrowLeft, Info, Ban, User,
 } from 'lucide-react';
 
 const STEP = { ADDRESS: 'address', RISK: 'risk', AMOUNT: 'amount', CONFIRM: 'confirm', RESULT: 'result' };
@@ -23,16 +16,17 @@ export default function SendPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [step,        setStep]        = useState(STEP.ADDRESS);
-  const [toAddress,   setToAddress]   = useState('');
-  const [riskReport,  setRiskReport]  = useState(null);
-  const [amount,      setAmount]      = useState('');
-  const [note,        setNote]        = useState('');
-  const [bypassRisk,  setBypassRisk]  = useState(false);
-  const [accepted,    setAccepted]    = useState(false);
-  const [loading,     setLoading]     = useState(false);
-  const [error,       setError]       = useState('');
-  const [txResult,    setTxResult]    = useState(null);
+  const [step,           setStep]           = useState(STEP.ADDRESS);
+  const [toAddress,      setToAddress]      = useState('');
+  const [riskReport,     setRiskReport]     = useState(null);
+  const [receiverName,   setReceiverName]   = useState(null); // ← new
+  const [amount,         setAmount]         = useState('');
+  const [note,           setNote]           = useState('');
+  const [bypassRisk,     setBypassRisk]     = useState(false);
+  const [accepted,       setAccepted]       = useState(false);
+  const [loading,        setLoading]        = useState(false);
+  const [error,          setError]          = useState('');
+  const [txResult,       setTxResult]       = useState(null);
   const inputRef = useRef(null);
 
   const isBlocked = riskReport?.blocked === true;
@@ -44,10 +38,16 @@ export default function SendPage() {
     setLoading(true);
     setError('');
     setRiskReport(null);
+    setReceiverName(null);
     setAccepted(false);
     try {
-      const { data } = await riskAPI.analyze(toAddress.trim());
-      setRiskReport(data);
+      // Run risk analysis and username lookup in parallel
+      const [riskRes, lookupRes] = await Promise.all([
+        riskAPI.analyze(toAddress.trim()),
+        authAPI.lookupWallet(toAddress.trim()).catch(() => ({ data: { found: false } })),
+      ]);
+      setRiskReport(riskRes.data);
+      if (lookupRes.data.found) setReceiverName(lookupRes.data.username);
       setStep(STEP.RISK);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to analyze address. Is the backend running?');
@@ -104,12 +104,29 @@ export default function SendPage() {
     setStep(STEP.ADDRESS);
     setToAddress('');
     setRiskReport(null);
+    setReceiverName(null);
     setAmount('');
     setNote('');
     setBypassRisk(false);
     setAccepted(false);
     setError('');
     setTxResult(null);
+  }
+
+  // ---- Receiver badge (shown wherever we display the address) ----
+  function ReceiverBadge() {
+    if (!receiverName) return null;
+    return (
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: '5px',
+        padding: '3px 10px', borderRadius: '999px',
+        backgroundColor: '#0f2a4a', border: '1px solid #1e3a5f',
+        fontSize: '12px', fontWeight: 700, color: '#60a5fa',
+        marginBottom: '8px',
+      }}>
+        <User size={12} /> @{receiverName}
+      </div>
+    );
   }
 
   return (
@@ -155,9 +172,9 @@ export default function SendPage() {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {[
                     { label: '✅ Safe',        addr: 'yNsWkgPLN1u84oBrigDPQ5NgNYEDxQ9rjS'  },
-                    { label: '⚠️ Medium',     addr: 'ySampleSuspiciousAddress1111111111'    },
-                    { label: '🔴 High',        addr: 'yHighRiskBurnerWallet33333333333333'  },
-                    { label: '🚨 Blacklisted', addr: 'yXkHXoFjmQMHZ3J2rkVhiMpnMmNiPkBMzE' },
+                    { label: '⚠️ Medium',      addr: 'ySampleSuspiciousAddress1111111111'    },
+                    { label: '🔴 High',         addr: 'yHighRiskBurnerWallet33333333333333'  },
+                    { label: '🚨 Blacklisted',  addr: 'yXkHXoFjmQMHZ3J2rkVhiMpnMmNiPkBMzE' },
                   ].map(({ label, addr }) => (
                     <button key={addr} type="button"
                       onClick={() => setToAddress(addr)}
@@ -186,7 +203,9 @@ export default function SendPage() {
               <RiskBadge report={riskReport} size="large" />
             </div>
 
+            {/* Receiver address + optional username */}
             <div style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: '8px', backgroundColor: '#0f172a', border: '1px solid #1e293b' }}>
+              <ReceiverBadge />
               <div style={{ fontSize: '11px', color: '#475569', marginBottom: '3px' }}>RECIPIENT ADDRESS</div>
               <div style={{ fontFamily: 'monospace', fontSize: '12px', color: '#94a3b8', wordBreak: 'break-all' }}>{riskReport.address}</div>
             </div>
@@ -221,7 +240,7 @@ export default function SendPage() {
               </div>
             )}
 
-            {/* ── Blocked: hard stop, no way forward ── */}
+            {/* ── Blocked: hard stop ── */}
             {isBlocked ? (
               <div>
                 <div style={{
@@ -238,9 +257,7 @@ export default function SendPage() {
                 </button>
               </div>
             ) : (
-              /* ── Non-blocked: show proceed options ── */
               <div>
-                {/* Acceptance checkbox for high/critical */}
                 {(riskReport.level === 'high' || riskReport.level === 'critical') && (
                   <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', marginBottom: '16px', padding: '12px', borderRadius: '8px', border: '1px solid #7f1d1d', backgroundColor: '#1c0a0a' }}>
                     <input
@@ -286,11 +303,20 @@ export default function SendPage() {
           <div style={card}>
             <h2 style={cardTitle}><Send size={18} /> Enter Amount</h2>
 
-            {riskReport && (
-              <div style={{ marginBottom: '20px' }}>
-                <RiskBadge report={riskReport} size="normal" />
-              </div>
-            )}
+            {/* Show receiver name + risk badge */}
+            <div style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {receiverName && (
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '5px',
+                  padding: '4px 10px', borderRadius: '999px', alignSelf: 'flex-start',
+                  backgroundColor: '#0f2a4a', border: '1px solid #1e3a5f',
+                  fontSize: '12px', fontWeight: 700, color: '#60a5fa',
+                }}>
+                  <User size={12} /> Sending to @{receiverName}
+                </div>
+              )}
+              {riskReport && <RiskBadge report={riskReport} size="normal" />}
+            </div>
 
             <form onSubmit={handleReview}>
               <div style={{ marginBottom: '16px' }}>
@@ -340,18 +366,36 @@ export default function SendPage() {
 
             <div style={{ marginBottom: '20px' }}>
               {[
-                { label: 'From',       value: user?.walletAddress, mono: true },
-                { label: 'To',         value: toAddress, mono: true },
-                { label: 'Amount',     value: `${parseFloat(amount).toFixed(4)} DASH` },
-                { label: 'Fee',        value: '0.0001 DASH (estimated)' },
-                { label: 'Note',       value: note || '—' },
-                { label: 'Risk Level', value: `${riskReport?.level?.toUpperCase()} (${riskReport?.score}/10)` },
-              ].map(({ label, value, mono }) => (
+                { label: 'From',        value: user?.walletAddress, mono: true },
+                // Show "To" with optional username badge
+                {
+                  label: 'To',
+                  value: toAddress,
+                  mono: true,
+                  badge: receiverName ? `@${receiverName}` : null,
+                },
+                { label: 'Amount',      value: `${parseFloat(amount).toFixed(4)} DASH` },
+                { label: 'Fee',         value: '0.0001 DASH (estimated)' },
+                { label: 'Note',        value: note || '—' },
+                { label: 'Risk Level',  value: `${riskReport?.level?.toUpperCase()} (${riskReport?.score}/10)` },
+              ].map(({ label, value, mono, badge }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #1e293b', gap: '16px' }}>
                   <span style={{ fontSize: '13px', color: '#64748b', flexShrink: 0 }}>{label}</span>
-                  <span style={{ fontSize: '13px', color: '#e2e8f0', fontFamily: mono ? 'monospace' : 'inherit', wordBreak: 'break-all', textAlign: 'right' }}>
-                    {value}
-                  </span>
+                  <div style={{ textAlign: 'right' }}>
+                    {badge && (
+                      <div style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        fontSize: '11px', fontWeight: 700, color: '#60a5fa',
+                        backgroundColor: '#0f2a4a', border: '1px solid #1e3a5f',
+                        borderRadius: '4px', padding: '1px 6px', marginBottom: '4px',
+                      }}>
+                        <User size={10} /> {badge}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '13px', color: '#e2e8f0', fontFamily: mono ? 'monospace' : 'inherit', wordBreak: 'break-all' }}>
+                      {value}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -381,7 +425,17 @@ export default function SendPage() {
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
               <CheckCircle size={48} color="#10b981" style={{ marginBottom: '12px' }} />
               <h2 style={{ margin: 0, color: '#f8fafc', fontSize: '20px' }}>Transaction Broadcast!</h2>
-              <p style={{ color: '#64748b', fontSize: '14px', marginTop: '6px' }}>
+              {receiverName && (
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '5px',
+                  marginTop: '8px', padding: '3px 10px', borderRadius: '999px',
+                  backgroundColor: '#0f2a4a', border: '1px solid #1e3a5f',
+                  fontSize: '12px', fontWeight: 700, color: '#60a5fa',
+                }}>
+                  <User size={12} /> Sent to @{receiverName}
+                </div>
+              )}
+              <p style={{ color: '#64748b', fontSize: '14px', marginTop: '8px' }}>
                 Your transaction has been sent to the Dash testnet.
               </p>
             </div>

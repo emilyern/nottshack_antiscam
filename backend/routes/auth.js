@@ -115,4 +115,17 @@ router.get("/me", require("../middleware/auth"), (req, res) => {
   }
 });
 
+// Look up a registered user by their wallet address.
+// Returns { found: true, username } or { found: false }.
+// Used by the Send page to show the receiver's username.
+router.get("/lookup", require("../middleware/auth"), (req, res) => {
+  const { wallet } = req.query;
+  if (!wallet) return res.status(400).json({ error: "wallet query param required." });
+
+  const user = db.findUserByWalletAddress(wallet);
+  if (!user) return res.status(200).json({ found: false });
+
+  return res.status(200).json({ found: true, username: user.username });
+});
+
 module.exports = router;

@@ -20,6 +20,7 @@ router.post("/analyze", authMiddleware, async (req, res) => {
     if (datasetEntry.blacklisted) {
       return res.status(200).json({
         address,
+        blocked: true,
         level: "critical",
         score: 10,
         recommendation: "This address is blacklisted. Transaction is blocked.",
@@ -33,27 +34,32 @@ router.post("/analyze", authMiddleware, async (req, res) => {
       });
     }
 
-    // 2. Look up live transaction history from DB for this address
+    // 2. Check if this address has any real transactions in the DB
     const liveHistory = db.getTransactionsByWallet(address);
-    const liveTxCount = liveHistory.length;
-    const liveTotalAmount = liveHistory.reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
-    // 3. Merge: live DB data takes priority over dataset defaults
-    const mergedWalletData = {
-      transaction_count: liveTxCount > 0 ? liveTxCount : (datasetEntry.transaction_count || 0),
-      total_amount: liveTotalAmount > 0 ? liveTotalAmount : (datasetEntry.total_amount || 0),
-    };
+    // 3. If at least 1 prior transaction exists in the DB, use that history.
+    //    Otherwise fall back to the static dataset profile (demo addresses).
+    let transactions;
+    if (liveHistory.length > 0) {
+      transactions = liveHistory;
+    } else {
+      transactions = datasetEntry.transactions || [];
+    }
 
-    const result = riskScore(mergedWalletData);
+    // 4. Run the risk engine with the full transactions array so time-window
+    //    checks work correctly and NEW_WALLET is not falsely triggered.
+    const result = riskScore({ transactions });
 
     const recommendations = {
-      low:    "This address appears safe. You may proceed with the transaction.",
-      medium: "This address has some risk signals. Proceed with caution.",
-      high:   "This address has high risk indicators. We strongly advise against sending.",
+      low:      "This address appears safe. You may proceed with the transaction.",
+      medium:   "This address has some risk signals. Proceed with caution.",
+      high:     "This address has high risk indicators. We strongly advise against sending.",
+      critical: "This address is extremely high risk. Transaction is strongly discouraged.",
     };
 
     return res.status(200).json({
       address,
+      blocked: false,
       level: result.level,
       score: result.score,
       recommendation: recommendations[result.level] || "Risk level unknown.",

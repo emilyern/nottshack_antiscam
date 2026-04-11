@@ -48,7 +48,7 @@ router.post("/send", authMiddleware, async (req, res) => {
     if (!result.success) {
       return res.status(400).json({ error: result.error });
     }
-    const newBalance = (user.balance ?? 10.5) - amount;
+    const newBalance = (user.balance ?? 10000000000000000) - amount;
     if (newBalance < 0) {
       return res.status(400).json({ error: "Insufficient balance." });
     }

@@ -1,3 +1,4 @@
+// Frontend/src/api.js — full replacement
 import axios from 'axios';
 
 const BASE_URL = process.env.REACT_APP_API_URL || '';
@@ -29,14 +30,15 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  register: (data) => api.post('/auth/register', data),
-  login:    (data) => api.post('/auth/login', data),
-  me:       ()     => api.get('/auth/me'),
+  register:     (data)   => api.post('/auth/register', data),
+  login:        (data)   => api.post('/auth/login', data),
+  me:           ()       => api.get('/auth/me'),
+  // Look up a registered user by wallet address (used by Send page)
+  lookupWallet: (wallet) => api.get('/auth/lookup', { params: { wallet } }),
 };
 
 export const walletAPI = {
   getBalance: () => api.get('/wallet/balance'),
-  // Fixed: /wallet/transactions doesn't exist, use /wallet/history
   getHistory: () => api.get('/wallet/history'),
 };
 
