@@ -6,21 +6,23 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '../Navbar';
 import api from '../api';
+import { useAuth } from '../AuthContext';
 import { TrendingUp, RefreshCw, CheckCircle, AlertTriangle, ChevronRight, Loader } from 'lucide-react';
 
 const QUICK_AMOUNTS_MYR = [50, 100, 200, 500, 1000];
 
 export default function Buy() {
   const navigate = useNavigate();
-  const [myrAmount, setMyrAmount]     = useState('');
-  const [dashPrice, setDashPrice]     = useState(null);
+  const { myrBalance, setMyrBalance } = useAuth(); // ← shared MYR balance from Context
+
+  const [myrAmount,    setMyrAmount]    = useState('');
+  const [dashPrice,    setDashPrice]    = useState(null);
   const [dashPriceUSD, setDashPriceUSD] = useState(null);
-  const [myrBalance, setMyrBalance]   = useState(null);
   const [loadingPrice, setLoadingPrice] = useState(true);
-  const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState('');
-  const [success, setSuccess]         = useState(null);
-  const [lastUpdated, setLastUpdated] = useState(null);
+  const [loading,      setLoading]      = useState(false);
+  const [error,        setError]        = useState('');
+  const [success,      setSuccess]      = useState(null);
+  const [lastUpdated,  setLastUpdated]  = useState(null);
 
   async function fetchPrice() {
     setLoadingPrice(true);
@@ -38,42 +40,35 @@ export default function Buy() {
     }
   }
 
-  async function fetchBalances() {
-    try {
-      const { data } = await api.get('/exchange/balances');
-      setMyrBalance(data.myrBalance ?? 0);
-    } catch {
-      setMyrBalance(0);
-    }
-  }
-
   useEffect(() => {
     fetchPrice();
-    fetchBalances();
     const interval = setInterval(fetchPrice, 60000);
     return () => clearInterval(interval);
   }, []);
 
   const dashAmount = dashPrice && myrAmount ? (parseFloat(myrAmount) / dashPrice) : 0;
-  const notEnoughMyr = myrBalance !== null && parseFloat(myrAmount) > myrBalance;
+  const notEnoughMyr = parseFloat(myrAmount) > myrBalance;
 
   async function handleBuy() {
     const myr = parseFloat(myrAmount);
-    if (!myr || myr <= 0)    return setError('Please enter a valid amount.');
-    if (myr < 10)            return setError('Minimum purchase is RM10.');
-    if (notEnoughMyr)        return setError('Insufficient MYR balance. Please top up first.');
+    if (!myr || myr <= 0)   return setError('Please enter a valid amount.');
+    if (myr < 10)           return setError('Minimum purchase is RM10.');
+    if (notEnoughMyr)       return setError('Insufficient MYR balance. Please top up first.');
 
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/exchange/buy', {
-        myrAmount: myr,
+      // Deduct MYR from shared context balance (simulated)
+      const newMyrBalance = myrBalance - myr;
+      setMyrBalance(newMyrBalance);
+
+      setSuccess({
         dashAmount,
-        rate: dashPrice,
+        newMyrBalance,
+        newDashBalance: dashAmount, // simplified for demo
       });
-      setSuccess(data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Purchase failed.');
+      setError('Purchase failed.');
     } finally {
       setLoading(false);
     }
@@ -92,11 +87,10 @@ export default function Buy() {
             </div>
             <div style={{ background: '#020617', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
               {[
-                { label: 'You paid',       value: `RM ${parseFloat(myrAmount).toFixed(2)}` },
-                { label: 'You received',   value: `${success.dashAmount.toFixed(6)} DASH` },
-                { label: 'Rate',           value: `RM ${dashPrice?.toFixed(2)} / DASH` },
-                { label: 'MYR Balance',    value: `RM ${success.newMyrBalance.toFixed(2)}` },
-                { label: 'DASH Balance',   value: `${success.newDashBalance.toFixed(6)} DASH` },
+                { label: 'You paid',     value: `RM ${parseFloat(myrAmount).toFixed(2)}` },
+                { label: 'You received', value: `${success.dashAmount.toFixed(6)} DASH` },
+                { label: 'Rate',         value: `RM ${dashPrice?.toFixed(2)} / DASH` },
+                { label: 'MYR Balance',  value: `RM ${success.newMyrBalance.toFixed(2)}` },
               ].map(({ label, value }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #1e293b' }}>
                   <span style={{ color: '#64748b', fontSize: '13px' }}>{label}</span>
@@ -105,7 +99,7 @@ export default function Buy() {
               ))}
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => { setSuccess(null); setMyrAmount(''); fetchBalances(); }} style={btnSecondary}>Buy More</button>
+              <button onClick={() => { setSuccess(null); setMyrAmount(''); }} style={btnSecondary}>Buy More</button>
               <button onClick={() => navigate('/dashboard')} style={{ ...btnPrimary, flex: 1 }}>Go to Dashboard</button>
             </div>
           </div>
@@ -124,12 +118,12 @@ export default function Buy() {
           <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: '14px' }}>Purchase DASH using your MYR wallet balance</p>
         </div>
 
-        {/* MYR Balance */}
+        {/* MYR Balance — from shared Context */}
         <div style={{ ...card, marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Your MYR Balance</div>
             <div style={{ fontSize: '22px', fontWeight: 800, color: myrBalance > 0 ? '#f8fafc' : '#ef4444', marginTop: '4px' }}>
-              RM {myrBalance !== null ? myrBalance.toFixed(2) : '—'}
+              RM {myrBalance.toFixed(2)}
             </div>
           </div>
           {myrBalance === 0 && (
@@ -180,7 +174,7 @@ export default function Buy() {
                 style={{ ...inputStyle, fontSize: '20px', fontWeight: 700, paddingRight: '60px', borderColor: notEnoughMyr ? '#ef4444' : '#1e293b' }} />
               <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', fontSize: '14px', fontWeight: 600, color: '#64748b' }}>MYR</span>
             </div>
-            {notEnoughMyr && <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>⚠ Insufficient balance — <Link to="/topup" style={{ color: '#3b82f6' }}>Top Up here</Link></div>}
+            {notEnoughMyr && <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>⚠ Insufficient balance</div>}
           </div>
 
           <div style={{ textAlign: 'center', margin: '12px 0', color: '#334155' }}>
@@ -205,6 +199,8 @@ export default function Buy() {
           </button>
           <p style={{ fontSize: '11px', color: '#334155', textAlign: 'center', marginTop: '12px' }}>🔒 Simulated purchase. Price from CoinGecko.</p>
         </div>
+
+        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </main>
     </div>
   );

@@ -26,7 +26,7 @@ const RISK_COLORS = {
 };
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, myrBalance } = useAuth(); // ← get myrBalance from context
 
   const [balance,      setBalance]      = useState(null);
   const [history,      setHistory]      = useState([]);
@@ -37,7 +37,6 @@ export default function Dashboard() {
   const [dashPriceMyr, setDashPriceMyr] = useState(null);
   const intervalRef = useRef(null);
 
-  // ---- Fetch balance (silent = no spinner) ----
   const fetchBalance = useCallback(async (silent = false) => {
     try {
       const { data } = await walletAPI.getBalance();
@@ -48,23 +47,18 @@ export default function Dashboard() {
     }
   }, []);
 
-  // ---- Fetch history ----
   const fetchHistory = useCallback(async () => {
     try {
       const { data } = await walletAPI.getHistory();
       setHistory(data.transactions || []);
-    } catch {
-      // non-critical
-    }
+    } catch {}
   }, []);
 
-  // ---- Initial load ----
   const initialFetch = useCallback(async () => {
     await Promise.all([fetchBalance(false), fetchHistory()]);
     setInitialLoad(false);
   }, [fetchBalance, fetchHistory]);
 
-  // ---- Manual refresh ----
   const manualRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([fetchBalance(true), fetchHistory()]);
@@ -89,16 +83,13 @@ export default function Dashboard() {
         );
         const data = await res.json();
         setDashPriceMyr(data?.dash?.myr || null);
-      } catch {
-        // silently fail
-      }
+      } catch {}
     }
     fetchPrice();
     const priceInterval = setInterval(fetchPrice, 60000);
     return () => clearInterval(priceInterval);
   }, []);
 
-  // ---- Derived stats ----
   const sentTxs     = history.filter((t) => t.fromAddress === user?.walletAddress);
   const receivedTxs = history.filter((t) => t.toAddress   === user?.walletAddress);
   const totalSent   = sentTxs.reduce((s, t) => s + (t.amount || 0), 0);
@@ -133,7 +124,6 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#020617' }}>
       <Navbar />
-
       <main style={{ maxWidth: '1100px', margin: '0 auto', padding: '28px 24px' }}>
 
         {error && <div style={errorBanner}>{error}</div>}
@@ -170,7 +160,7 @@ export default function Dashboard() {
                   <span style={{ fontSize: '14px', color: '#64748b', marginLeft: '6px' }}>DASH</span>
                 </div>
 
-                {/* Live MYR equivalent from CoinGecko */}
+                {/* Live MYR equivalent of DASH */}
                 {dashPriceMyr && balance?.balance != null && (
                   <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
                     ≈ RM {(balance.balance * dashPriceMyr).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -186,10 +176,12 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* MYR Wallet — hardcoded RM 500 demo balance */}
+                {/* MYR Wallet — from shared Context */}
                 <div style={{ marginTop: '12px', padding: '8px 12px', borderRadius: '8px', backgroundColor: '#0a1628', border: '1px solid #1e3a5f', textAlign: 'right' }}>
                   <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>MYR Wallet</div>
-                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#34d399' }}>RM 500.00</div>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#34d399' }}>
+                    RM {myrBalance.toFixed(2)}
+                  </div>
                   <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px' }}>Available balance</div>
                 </div>
 
@@ -207,42 +199,20 @@ export default function Dashboard() {
           </div>
 
           {/* Sent stat */}
-          <StatCard
-            icon={<ArrowUpRight size={18} color="#f97316" />}
-            label="Total Sent"
-            value={`${totalSent.toFixed(4)} DASH`}
-            sub={`${sentTxs.length} transactions`}
-            color="#f97316"
-          />
+          <StatCard icon={<ArrowUpRight size={18} color="#f97316" />} label="Total Sent" value={`${totalSent.toFixed(4)} DASH`} sub={`${sentTxs.length} transactions`} color="#f97316" />
 
           {/* Received stat */}
-          <StatCard
-            icon={<ArrowDownLeft size={18} color="#10b981" />}
-            label="Total Received"
-            value={`${totalRecv.toFixed(4)} DASH`}
-            sub={`${receivedTxs.length} transactions`}
-            color="#10b981"
-          />
+          <StatCard icon={<ArrowDownLeft size={18} color="#10b981" />} label="Total Received" value={`${totalRecv.toFixed(4)} DASH`} sub={`${receivedTxs.length} transactions`} color="#10b981" />
 
           {/* Risk flagged */}
-          <StatCard
-            icon={<AlertTriangle size={18} color="#ef4444" />}
-            label="High Risk Blocked"
-            value={sentTxs.filter((t) => t.riskLevel === 'critical' || t.riskLevel === 'high').length}
-            sub="transactions flagged"
-            color="#ef4444"
-          />
+          <StatCard icon={<AlertTriangle size={18} color="#ef4444" />} label="High Risk Blocked" value={sentTxs.filter((t) => t.riskLevel === 'critical' || t.riskLevel === 'high').length} sub="transactions flagged" color="#ef4444" />
         </div>
 
         {/* ======== CHARTS ROW ======== */}
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px', marginBottom: '28px' }}>
-
           <div style={card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={sectionTitle}>
-                <TrendingUp size={16} style={{ marginRight: '6px' }} />
-                7-Day Activity (DASH)
-              </h3>
+              <h3 style={sectionTitle}><TrendingUp size={16} style={{ marginRight: '6px' }} />7-Day Activity (DASH)</h3>
             </div>
             {barData.every(d => d.sent === 0 && d.received === 0) ? (
               <EmptyState message="No transactions yet. Send some DASH to see activity!" />
@@ -251,11 +221,8 @@ export default function Dashboard() {
                 <BarChart data={barData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                   <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#f8fafc', fontSize: '12px' }}
-                    cursor={{ fill: '#1e293b' }}
-                  />
-                  <Bar dataKey="sent"     name="Sent"     fill="#f97316" radius={[4,4,0,0]} />
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#f8fafc', fontSize: '12px' }} cursor={{ fill: '#1e293b' }} />
+                  <Bar dataKey="sent" name="Sent" fill="#f97316" radius={[4,4,0,0]} />
                   <Bar dataKey="received" name="Received" fill="#10b981" radius={[4,4,0,0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -263,23 +230,16 @@ export default function Dashboard() {
           </div>
 
           <div style={card}>
-            <h3 style={{ ...sectionTitle, marginBottom: '20px' }}>
-              <Shield size={16} style={{ marginRight: '6px' }} />
-              Risk Distribution
-            </h3>
+            <h3 style={{ ...sectionTitle, marginBottom: '20px' }}><Shield size={16} style={{ marginRight: '6px' }} />Risk Distribution</h3>
             {pieData.length === 0 ? (
               <EmptyState message="Risk data will appear after your first transaction." />
             ) : (
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
-                    {pieData.map((entry) => (
-                      <Cell key={entry.name} fill={RISK_COLORS[entry.name] || '#475569'} />
-                    ))}
+                    {pieData.map((entry) => (<Cell key={entry.name} fill={RISK_COLORS[entry.name] || '#475569'} />))}
                   </Pie>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#f8fafc', fontSize: '12px' }}
-                  />
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#f8fafc', fontSize: '12px' }} />
                   <Legend formatter={(v) => <span style={{ color: '#94a3b8', fontSize: '12px' }}>{v}</span>} />
                 </PieChart>
               </ResponsiveContainer>
@@ -311,37 +271,21 @@ export default function Dashboard() {
                 const isSent = tx.fromAddress === user?.walletAddress;
                 return (
                   <div key={tx.id} style={txRow}>
-                    <div style={{
-                      width: '32px', height: '32px', borderRadius: '50%',
-                      backgroundColor: isSent ? '#431407' : '#052e16',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>
-                      {isSent
-                        ? <ArrowUpRight size={16} color="#f97316" />
-                        : <ArrowDownLeft size={16} color="#10b981" />
-                      }
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: isSent ? '#431407' : '#052e16', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {isSent ? <ArrowUpRight size={16} color="#f97316" /> : <ArrowDownLeft size={16} color="#10b981" />}
                     </div>
-
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>
-                        {isSent ? 'Sent' : 'Received'}
-                      </div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>{isSent ? 'Sent' : 'Received'}</div>
                       <div style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {isSent ? `→ ${tx.toAddress}` : `← ${tx.fromAddress}`}
                       </div>
                     </div>
-
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '14px', fontWeight: 700, color: isSent ? '#f97316' : '#10b981' }}>
                         {isSent ? '-' : '+'}{tx.amount?.toFixed(4)} DASH
                       </div>
-                      {tx.riskLevel && (
-                        <div style={{ marginTop: '3px' }}>
-                          <RiskPill level={tx.riskLevel} score={tx.riskScore} />
-                        </div>
-                      )}
+                      {tx.riskLevel && <div style={{ marginTop: '3px' }}><RiskPill level={tx.riskLevel} score={tx.riskScore} /></div>}
                     </div>
-
                     <div style={{ fontSize: '11px', color: '#475569', textAlign: 'right', whiteSpace: 'nowrap' }}>
                       {tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : '—'}
                     </div>
@@ -358,15 +302,11 @@ export default function Dashboard() {
   );
 }
 
-// ---- Helper components ----
-
 function StatCard({ icon, label, value, sub, color }) {
   return (
     <div style={card}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-        <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {icon}
-        </div>
+        <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{icon}</div>
         <span style={cardLabel}>{label}</span>
       </div>
       <div style={{ fontSize: '22px', fontWeight: 800, color: '#f8fafc' }}>{value}</div>
@@ -397,13 +337,12 @@ function buildBarData(history, myAddress) {
     const txDate = new Date(tx.timestamp).toDateString();
     const bucket = days.find((d) => d.date === txDate);
     if (!bucket) return;
-    if (tx.fromAddress === myAddress) bucket.sent     += tx.amount || 0;
-    else                              bucket.received += tx.amount || 0;
+    if (tx.fromAddress === myAddress) bucket.sent += tx.amount || 0;
+    else bucket.received += tx.amount || 0;
   });
   return days;
 }
 
-// ---- Shared styles ----
 const card = { backgroundColor: '#0f172a', borderRadius: '14px', border: '1px solid #1e293b', padding: '20px' };
 const cardLabel = { fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center' };
 const sectionTitle = { margin: 0, fontSize: '14px', fontWeight: 700, color: '#e2e8f0', display: 'flex', alignItems: 'center' };

@@ -8,8 +8,9 @@ import { authAPI } from './api';
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user,       setUser]       = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  const [myrBalance, setMyrBalance] = useState(500); // ← shared MYR balance, default RM 500
 
   useEffect(() => {
     const token     = localStorage.getItem('dashguard_token');
@@ -34,16 +35,18 @@ export function AuthProvider({ children }) {
     localStorage.setItem('dashguard_token', token);
     localStorage.setItem('dashguard_user', JSON.stringify(userData));
     setUser(userData);
+    setMyrBalance(500); // reset to RM 500 on every login
   }
 
   function logout() {
     localStorage.removeItem('dashguard_token');
     localStorage.removeItem('dashguard_user');
     setUser(null);
+    setMyrBalance(500); // reset on logout
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, isLoggedIn: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, isLoggedIn: !!user, myrBalance, setMyrBalance }}>
       {children}
     </AuthContext.Provider>
   );
