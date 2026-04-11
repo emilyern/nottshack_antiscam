@@ -3,7 +3,7 @@ const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 const { riskScore } = require("../services/riskEngine");
 const { getWalletData } = require("../models/walletdataset");
-const { getBlock, addBlock } = require("../models/blocks");
+const db = require("../models/database");
 
 // ─── POST /risk/analyze ────────────────────────────────────────
 router.post("/analyze", authMiddleware, async (req, res) => {
@@ -14,64 +14,50 @@ router.post("/analyze", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: "address is required." });
     }
 
-    const walletData = getWalletData(address);
+    // 1. Check dataset (handles blacklisted + known wallets)
+    const datasetEntry = getWalletData(address);
 
-    // ── Blacklisted: force score 10, record block, hard stop ───
-    if (walletData.blacklisted) {
-      addBlock(address, walletData.blacklist_reason || "Address is on the blacklist.");
-
+    if (datasetEntry.blacklisted) {
       return res.status(200).json({
         address,
-        level:          "critical",
-        score:          10,
-        blocked:        true,
-        recommendation: "This address is permanently blocked. No transactions can be made to this address.",
+        level: "critical",
+        score: 10,
+        recommendation: "This address is blacklisted. Transaction is blocked.",
         factors: [
           {
-            code:        "BLACKLISTED",
-            description: walletData.blacklist_reason || "Address is on the blacklist.",
-            weight:      10,
+            code: "BLACKLISTED",
+            description: datasetEntry.blacklist_reason || "Address is on the blacklist.",
+            weight: 10,
           },
         ],
       });
     }
 
-    // ── Check if address was previously blocked ─────────────────
-    const existingBlock = getBlock(address);
-    if (existingBlock) {
-      return res.status(200).json({
-        address,
-        level:          "critical",
-        score:          10,
-        blocked:        true,
-        recommendation: `This address is permanently blocked since ${new Date(existingBlock.blockedAt).toLocaleString()}. No transactions can be made.`,
-        factors: [
-          {
-            code:        "BLOCKED",
-            description: existingBlock.reason,
-            weight:      10,
-          },
-        ],
-      });
-    }
+    // 2. Look up live transaction history from DB for this address
+    const liveHistory = db.getTransactionsByWallet(address);
+    const liveTxCount = liveHistory.length;
+    const liveTotalAmount = liveHistory.reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
-    // ── Normal risk scoring ─────────────────────────────────────
-    const result = riskScore(walletData);
+    // 3. Merge: live DB data takes priority over dataset defaults
+    const mergedWalletData = {
+      transaction_count: liveTxCount > 0 ? liveTxCount : (datasetEntry.transaction_count || 0),
+      total_amount: liveTotalAmount > 0 ? liveTotalAmount : (datasetEntry.total_amount || 0),
+    };
+
+    const result = riskScore(mergedWalletData);
 
     const recommendations = {
-      low:      "This address appears safe. You may proceed with the transaction.",
-      medium:   "This address has some risk signals. Proceed with caution.",
-      high:     "This address shows high-risk activity — large amounts or unusual transaction frequency detected in a short period. We strongly advise against sending.",
-      critical: "This address shows patterns consistent with fraud or mixing — sudden large volume at very high frequency. Do not send.",
+      low:    "This address appears safe. You may proceed with the transaction.",
+      medium: "This address has some risk signals. Proceed with caution.",
+      high:   "This address has high risk indicators. We strongly advise against sending.",
     };
 
     return res.status(200).json({
       address,
-      level:          result.level,
-      score:          result.score,
-      blocked:        false,
+      level: result.level,
+      score: result.score,
       recommendation: recommendations[result.level] || "Risk level unknown.",
-      factors:        result.factors,
+      factors: result.factors,
     });
 
   } catch (err) {
@@ -83,16 +69,12 @@ router.post("/analyze", authMiddleware, async (req, res) => {
 // ─── GET /risk/report/:address ─────────────────────────────────
 router.get("/report/:address", authMiddleware, (req, res) => {
   const { address } = req.params;
-  const walletData  = getWalletData(address);
-  const block       = getBlock(address);
-
+  const walletData = getWalletData(address);
   return res.status(200).json({
     address,
-    label:            walletData.label,
-    blacklisted:      walletData.blacklisted,
+    label: walletData.label,
+    blacklisted: walletData.blacklisted,
     blacklist_reason: walletData.blacklist_reason || null,
-    blocked:          !!block,
-    blockedAt:        block?.blockedAt || null,
   });
 });
 
