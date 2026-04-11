@@ -34,7 +34,7 @@ export default function Dashboard() {
   const [error,        setError]        = useState('');
   const [copied,       setCopied]       = useState(false);
   const [refreshing,   setRefreshing]   = useState(false);
-  const [dashPriceMyr, setDashPriceMyr] = useState(null); // ← ADDED
+  const [dashPriceMyr, setDashPriceMyr] = useState(null);
   const intervalRef = useRef(null);
 
   // ---- Fetch balance (silent = no spinner) ----
@@ -48,7 +48,7 @@ export default function Dashboard() {
     }
   }, []);
 
-  // ---- Fetch history (silent = no spinner) ----
+  // ---- Fetch history ----
   const fetchHistory = useCallback(async () => {
     try {
       const { data } = await walletAPI.getHistory();
@@ -58,13 +58,13 @@ export default function Dashboard() {
     }
   }, []);
 
-  // ---- Initial load (show spinner once) ----
+  // ---- Initial load ----
   const initialFetch = useCallback(async () => {
     await Promise.all([fetchBalance(false), fetchHistory()]);
     setInitialLoad(false);
   }, [fetchBalance, fetchHistory]);
 
-  // ---- Manual refresh (show subtle spinner, no flicker) ----
+  // ---- Manual refresh ----
   const manualRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([fetchBalance(true), fetchHistory()]);
@@ -73,17 +73,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     initialFetch();
-
-    // Poll every 30 seconds silently — no spinner, no flicker
     intervalRef.current = setInterval(() => {
       fetchBalance(true);
       fetchHistory();
     }, 30000);
-
     return () => clearInterval(intervalRef.current);
   }, [initialFetch, fetchBalance, fetchHistory]);
 
-  // ---- ADDED: Fetch DASH price in MYR from CoinGecko ----
+  // ---- Fetch DASH price in MYR from CoinGecko ----
   useEffect(() => {
     async function fetchPrice() {
       try {
@@ -93,18 +90,17 @@ export default function Dashboard() {
         const data = await res.json();
         setDashPriceMyr(data?.dash?.myr || null);
       } catch {
-        // silently fail — price just won't show
+        // silently fail
       }
     }
     fetchPrice();
-    // Refresh price every 60 seconds
     const priceInterval = setInterval(fetchPrice, 60000);
     return () => clearInterval(priceInterval);
   }, []);
 
   // ---- Derived stats ----
-  const sentTxs    = history.filter((t) => t.fromAddress === user?.walletAddress);
-  const receivedTxs = history.filter((t) => t.toAddress  === user?.walletAddress);
+  const sentTxs     = history.filter((t) => t.fromAddress === user?.walletAddress);
+  const receivedTxs = history.filter((t) => t.toAddress   === user?.walletAddress);
   const totalSent   = sentTxs.reduce((s, t) => s + (t.amount || 0), 0);
   const totalRecv   = receivedTxs.reduce((s, t) => s + (t.amount || 0), 0);
 
@@ -148,6 +144,8 @@ export default function Dashboard() {
           {/* Wallet card */}
           <div style={{ ...card, gridColumn: 'span 2' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+
+              {/* Left: address */}
               <div>
                 <div style={cardLabel}>
                   <Wallet size={13} style={{ marginRight: '5px' }} /> Your Wallet
@@ -161,28 +159,40 @@ export default function Dashboard() {
                   </button>
                 </div>
               </div>
+
+              {/* Right: balances */}
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Balance</div>
+
+                {/* DASH balance */}
+                <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>DASH Balance</div>
                 <div style={{ fontSize: '28px', fontWeight: 800, color: '#f8fafc', lineHeight: 1.1 }}>
                   {balance?.balance?.toFixed(4) ?? '0.0000'}
                   <span style={{ fontSize: '14px', color: '#64748b', marginLeft: '6px' }}>DASH</span>
                 </div>
-                {balance?.unconfirmedBalance > 0 && (
-                  <div style={{ fontSize: '12px', color: '#f59e0b', marginTop: '4px' }}>
-                    +{balance.unconfirmedBalance.toFixed(4)} unconfirmed
-                  </div>
-                )}
-                {/* ---- ADDED: MYR conversion ---- */}
+
+                {/* Live MYR equivalent from CoinGecko */}
                 {dashPriceMyr && balance?.balance != null && (
-                  <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>
-                    ≈ <span style={{ color: '#34d399', fontWeight: 600 }}>
-                      RM {(balance.balance * dashPriceMyr).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
+                  <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
+                    ≈ RM {(balance.balance * dashPriceMyr).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     <span style={{ fontSize: '11px', color: '#475569', marginLeft: '6px' }}>
                       @ RM {dashPriceMyr.toLocaleString()} / DASH
                     </span>
                   </div>
                 )}
+
+                {balance?.unconfirmedBalance > 0 && (
+                  <div style={{ fontSize: '12px', color: '#f59e0b', marginTop: '4px' }}>
+                    +{balance.unconfirmedBalance.toFixed(4)} unconfirmed
+                  </div>
+                )}
+
+                {/* MYR Wallet — hardcoded RM 500 demo balance */}
+                <div style={{ marginTop: '12px', padding: '8px 12px', borderRadius: '8px', backgroundColor: '#0a1628', border: '1px solid #1e3a5f', textAlign: 'right' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>MYR Wallet</div>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#34d399' }}>RM 500.00</div>
+                  <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px' }}>Available balance</div>
+                </div>
+
               </div>
             </div>
 
@@ -282,11 +292,7 @@ export default function Dashboard() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h3 style={sectionTitle}>Recent Transactions</h3>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button
-                onClick={manualRefresh}
-                style={iconBtn}
-                title="Refresh"
-              >
+              <button onClick={manualRefresh} style={iconBtn} title="Refresh">
                 <RefreshCw size={14} color="#64748b" style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
               </button>
               <Link to="/history" style={{ ...smallBtn, textDecoration: 'none' }}>View All</Link>
