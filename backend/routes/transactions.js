@@ -95,7 +95,29 @@ router.get("/", authMiddleware, (req, res) => {
     const history = db.getTransactionsByWallet(wallet);
     return res.status(200).json({ wallet, transactions: history });
 
-  } catch (err) {
+    // Add balance
+    db.updatenewUserBalance(user.id, currentBalance + amount);
+
+    // Save to local database
+    db.addTransactions({
+      id: uuidv4(),
+      fromAddress: user.walletAddress,
+      toAddress,
+      amount,
+      note: note || "",
+      riskLevel: cleanLevel,
+      txid: result.txHash,
+      status: "broadcast",
+      timestamp: new Date().toISOString(),
+    });
+
+    // 8. Return success
+    return res.status(200).json({
+      txid: result.txHash,
+      explorerUrl: `https://testnet-insight.dashevo.org/insight/tx/${result.txHash}`,
+    });
+
+     } catch (err) {
     console.error("Transactions error:", err);
     return res.status(500).json({ error: "Internal server error." });
   }
