@@ -28,12 +28,13 @@ const RISK_COLORS = {
 export default function Dashboard() {
   const { user } = useAuth();
 
-  const [balance,     setBalance]     = useState(null);
-  const [history,     setHistory]     = useState([]);
-  const [initialLoad, setInitialLoad] = useState(true); // only show spinner on very first load
-  const [error,       setError]       = useState('');
-  const [copied,      setCopied]      = useState(false);
-  const [refreshing,  setRefreshing]  = useState(false); // subtle indicator for manual refresh
+  const [balance,      setBalance]      = useState(null);
+  const [history,      setHistory]      = useState([]);
+  const [initialLoad,  setInitialLoad]  = useState(true);
+  const [error,        setError]        = useState('');
+  const [copied,       setCopied]       = useState(false);
+  const [refreshing,   setRefreshing]   = useState(false);
+  const [dashPriceMyr, setDashPriceMyr] = useState(null); // ← ADDED
   const intervalRef = useRef(null);
 
   // ---- Fetch balance (silent = no spinner) ----
@@ -81,6 +82,25 @@ export default function Dashboard() {
 
     return () => clearInterval(intervalRef.current);
   }, [initialFetch, fetchBalance, fetchHistory]);
+
+  // ---- ADDED: Fetch DASH price in MYR from CoinGecko ----
+  useEffect(() => {
+    async function fetchPrice() {
+      try {
+        const res = await fetch(
+          'https://api.coingecko.com/api/v3/simple/price?ids=dash&vs_currencies=myr'
+        );
+        const data = await res.json();
+        setDashPriceMyr(data?.dash?.myr || null);
+      } catch {
+        // silently fail — price just won't show
+      }
+    }
+    fetchPrice();
+    // Refresh price every 60 seconds
+    const priceInterval = setInterval(fetchPrice, 60000);
+    return () => clearInterval(priceInterval);
+  }, []);
 
   // ---- Derived stats ----
   const sentTxs    = history.filter((t) => t.fromAddress === user?.walletAddress);
@@ -150,6 +170,17 @@ export default function Dashboard() {
                 {balance?.unconfirmedBalance > 0 && (
                   <div style={{ fontSize: '12px', color: '#f59e0b', marginTop: '4px' }}>
                     +{balance.unconfirmedBalance.toFixed(4)} unconfirmed
+                  </div>
+                )}
+                {/* ---- ADDED: MYR conversion ---- */}
+                {dashPriceMyr && balance?.balance != null && (
+                  <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>
+                    ≈ <span style={{ color: '#34d399', fontWeight: 600 }}>
+                      RM {(balance.balance * dashPriceMyr).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#475569', marginLeft: '6px' }}>
+                      @ RM {dashPriceMyr.toLocaleString()} / DASH
+                    </span>
                   </div>
                 )}
               </div>
@@ -270,7 +301,6 @@ export default function Dashboard() {
             </EmptyState>
           ) : (
             <div>
-              {/* Latest first, show up to 8 */}
               {history.slice(0, 8).map((tx) => {
                 const isSent = tx.fromAddress === user?.walletAddress;
                 return (
