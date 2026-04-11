@@ -3,8 +3,8 @@
 /**
  * Calculate risk score based on wallet data
  * @param {Object} walletData - Wallet info
- *   { new_wallet: boolean, transaction_count: number, total_amount: number }
- * @returns {Object} { score: number, level: string }
+ *   { transaction_count: number, total_amount: number }
+ * @returns {Object} { score: number, level: string, factors: Array }
  */
 function riskScore(walletData) {
   let score = 0;
@@ -26,12 +26,12 @@ function riskScore(walletData) {
     factors.push({ code: "HIGH_VOLUME", description: "Large total transaction volume detected.", weight: 2 });
   }
 
-  // 4 levels, max natural score is 3
+  // BUG FIX: Added safe default so level is never undefined
   let level;
   if (score === 0)      level = "low";
   else if (score === 1) level = "medium";
   else if (score <= 3)  level = "high";
-  // critical is never set here — only via blacklist in routes/risk.js
+  else                  level = "high"; // safe fallback for any future score > 3
 
   const scoreOutOf10 = Math.round((score / 3) * 10);
   return { score: scoreOutOf10, level, factors };
@@ -39,8 +39,8 @@ function riskScore(walletData) {
 
 // Example usage
 if (require.main === module) {
-    const wallet = { new_wallet: true, transaction_count: 12, total_amount: 500 };
-    console.log(riskScore(wallet));
+  const wallet = { transaction_count: 12, total_amount: 500 };
+  console.log(riskScore(wallet));
 }
 
 module.exports = { riskScore };

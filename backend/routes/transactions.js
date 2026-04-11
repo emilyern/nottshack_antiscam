@@ -1,5 +1,5 @@
 const express = require("express");
-const router = require("express").Router();
+const router = express.Router();
 const { v4: uuidv4 } = require("uuid");
 const authMiddleware = require("../middleware/auth");
 const db = require("../models/database");
