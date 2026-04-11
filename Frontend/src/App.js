@@ -12,6 +12,7 @@ import Register  from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Send      from './pages/Send';
 import History   from './pages/History';
+import Profile   from './pages/Profile';
 
 // ---- ProtectedRoute: redirects to /login if not logged in ----
 function ProtectedRoute({ children }) {
@@ -64,6 +65,7 @@ export default function App() {
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/send"      element={<ProtectedRoute><Send      /></ProtectedRoute>} />
           <Route path="/history"   element={<ProtectedRoute><History   /></ProtectedRoute>} />
+          <Route path="/profile"   element={<ProtectedRoute><Profile   /></ProtectedRoute>} />
 
           {/* Default redirect */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

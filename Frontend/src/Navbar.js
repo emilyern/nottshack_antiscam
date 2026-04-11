@@ -85,15 +85,25 @@ export default function Navbar() {
               {user.walletAddress?.slice(0, 8)}...{user.walletAddress?.slice(-6)}
             </span>
           </div>
-          <div style={{
-            width: '32px', height: '32px',
-            borderRadius: '50%',
-            backgroundColor: '#1e3a5f',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '13px', fontWeight: 700, color: '#60a5fa',
-          }}>
+
+          {/* Avatar — clicking goes to /profile */}
+          <Link
+            to="/profile"
+            title="View Profile"
+            style={{
+              width: '32px', height: '32px',
+              borderRadius: '50%',
+              backgroundColor: location.pathname === '/profile' ? '#1e3a5f' : '#1e3a5f',
+              border: location.pathname === '/profile' ? '2px solid #3b82f6' : '2px solid transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '13px', fontWeight: 700, color: '#60a5fa',
+              textDecoration: 'none',
+              transition: 'border-color 0.15s',
+            }}
+          >
             {user.username?.[0]?.toUpperCase()}
-          </div>
+          </Link>
+
           <button
             onClick={handleLogout}
             style={{
