@@ -10,7 +10,7 @@ import { RiskPill } from '../RiskBadge';
 import Navbar from '../Navbar';
 import {
   ArrowUpRight, ArrowDownLeft, RefreshCw,
-  ExternalLink, Filter, Shield,
+  Filter, Shield,
 } from 'lucide-react';
 
 export default function History() {
@@ -166,6 +166,11 @@ export default function History() {
           )}
         </div>
 
+        {/* Legend note about broadcast status */}
+        <div style={{ marginTop: '16px', fontSize: '12px', color: '#475569', textAlign: 'right' }}>
+          * "Broadcast" means the transaction was submitted to the testnet. Confirmation tracking is not available in this demo.
+        </div>
+
       </main>
     </div>
   );
@@ -173,9 +178,9 @@ export default function History() {
 
 function StatusPill({ status }) {
   const map = {
-    broadcast:  { color: '#f59e0b', bg: '#1c1204', label: 'Pending'   },
-    confirmed:  { color: '#10b981', bg: '#052e16', label: 'Confirmed' },
-    failed:     { color: '#ef4444', bg: '#1c0a0a', label: 'Failed'    },
+    broadcast:  { color: '#f59e0b', bg: '#1c1204', label: 'Broadcast'  },
+    confirmed:  { color: '#10b981', bg: '#052e16', label: 'Confirmed'  },
+    failed:     { color: '#ef4444', bg: '#1c0a0a', label: 'Failed'     },
   };
   const cfg = map[status] || map.broadcast;
   return (
@@ -204,7 +209,7 @@ const headerRow = {
 };
 const dataRow = {
   display: 'grid',
-  gridTemplateColumns: '80px 1fr 120px 140px 90px 140px 60px',
+  gridTemplateColumns: '80px 1fr 120px 140px 90px 140px',
   padding: '12px 16px',
   borderBottom: '1px solid #0f172a',
   alignItems: 'center',

@@ -25,9 +25,10 @@ router.post("/send", authMiddleware, async (req, res) => {
       return res.status(404).json({ error: "User not found." });
     }
 
-    // 3. Risk check
-    const riskLevel = await checkRisk(toAddress);
-    const cleanLevel = riskLevel.replace(/^[^\w]+/, "").trim(); // strip emoji prefix
+    // 3. Risk check — now returns { level, score }
+    const risk = await checkRisk(toAddress);
+    const cleanLevel = risk.level.replace(/^[^\w]+/, "").trim(); // strip emoji prefix
+    const riskScoreValue = risk.score;
 
     if ((cleanLevel === "high" || cleanLevel === "critical") && !bypassRisk) {
       return res.status(403).json({
@@ -46,20 +47,14 @@ router.post("/send", authMiddleware, async (req, res) => {
     if (!result.success) {
       return res.status(400).json({ error: result.error });
     }
+
     const newBalance = (user.balance ?? 10.5) - amount;
     if (newBalance < 0) {
       return res.status(400).json({ error: "Insufficient balance." });
     }
     db.updateUserBalance(user.id, newBalance);
 
-    // After debiting sender, find recipient and credit them
-    const recipient = db.findUserByWalletAddress(toAddress);
-    if (recipient) {
-      const recipientNewBalance = (recipient.balance ?? 10.5) + amount;
-      db.updateUserBalance(recipient.id, recipientNewBalance);
-    }
-
-    // 5. Save to local database
+    // 5. Save to local database — includes riskScore now
     db.addTransaction({
       id: uuidv4(),
       fromAddress: user.walletAddress,
@@ -67,8 +62,9 @@ router.post("/send", authMiddleware, async (req, res) => {
       amount,
       note: note || "",
       riskLevel: cleanLevel,
+      riskScore: riskScoreValue,
       txid: result.txHash,
-      status: "Confirmed",
+      status: "broadcast",
       timestamp: new Date().toISOString(),
     });
 

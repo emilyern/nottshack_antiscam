@@ -1,15 +1,15 @@
 const { riskScore } = require('./riskEngine');
+const { getWalletData } = require('../models/walletdataset');
 
 async function checkRisk(walletAddress) {
-  // For now use basic scoring — swap with real API later
-  const walletData = {
-    new_wallet: true,
-    transaction_count: 0,
-    total_amount: 0,
-  };
+  const walletData = getWalletData(walletAddress);
+
+  if (walletData.blacklisted) {
+    return { level: 'critical', score: 10 };
+  }
 
   const result = riskScore(walletData);
-  return result.level;
+  return { level: result.level, score: result.score };
 }
 
 module.exports = { checkRisk };
